@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+@theme {
+  /* Deep Navy 기반 다크 팔레트 */
+  --color-navy-950: #060f1e;
+  --color-navy-900: #0a1628;
+  --color-navy-850: #0c1a30;
+  --color-navy-800: #0d1f38;
+  --color-navy-700: #142c4e;
+  --color-line: #17304f;
+  --color-line-strong: #1f3d63;
+
+  /* Electric Blue accent */
+  --color-accent: #3b82f6;
+  --color-accent-bright: #60a5fa;
+  --color-cyan-accent: #22d3ee;
+
+  --color-ink: #e8eef8;
+  --color-ink-soft: #9db1cc;
+  --color-ink-dim: #64748b;
+
+  --color-positive: #34d399;
+  --color-warning: #fb923c;
+  --color-negative: #f87171;
+
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+
+  --animate-fade-up: fade-up 0.45s ease-out both;
+  --animate-fade-in: fade-in 0.35s ease-out both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: -400px 0;
+    }
+    to {
+      background-position: 400px 0;
+    }
+  }
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-navy-950);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* 얇은 커스텀 스크롤바 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1f3d63 transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #1f3d63;
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 공통 카드 스타일 */
+.card {
+  background: linear-gradient(180deg, #0d1b30 0%, #0b1728 100%);
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+}
+.card-hover {
+  transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+.card-hover:hover {
+  border-color: var(--color-line-strong);
+  box-shadow: 0 8px 30px rgba(2, 8, 20, 0.45);
+}
+
+/* Recharts 기본 스타일 정리 */
+.recharts-cartesian-axis-tick text {
+  fill: #64748b;
+  font-size: 11px;
+}
+.recharts-tooltip-cursor {
+  stroke: #1f3d63;
+}
+.recharts-default-legend {
+  font-size: 12px;
+}
+.recharts-surface:focus,
+.recharts-wrapper:focus {
+  outline: none;
+}
+
+/* 스켈레톤 */
+.skeleton {
+  background: linear-gradient(90deg, #0d1b30 25%, #142c4e 50%, #0d1b30 75%);
+  background-size: 400px 100%;
+  animation: var(--animate-shimmer);
+  border-radius: 8px;
+}
+
+/* 숫자 서체 정렬 */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
