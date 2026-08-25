@@ -10,7 +10,7 @@ import InsightCarousel from "./InsightCarousel";
 import Sparkline from "./Sparkline";
 import ForecastCard from "./ForecastCard";
 import SectionHeader from "./SectionHeader";
-import { MiraeLockup } from "./MiraeLogo";
+import { MiraeWordmark } from "./MiraeLogo";
 import { BRAND } from "@/lib/brand";
 
 /** 모바일 홈 — '오늘의 비즈니스 요약' (첨부 디자인의 모바일 화면 구성) */
@@ -35,7 +35,7 @@ export default function MobileHome({
     <div className="lg:hidden">
       <div className="mb-4 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <MiraeLockup size="sm" />
+          <MiraeWordmark height={40} />
           <h1 className="mt-2 text-[25px] font-bold leading-tight tracking-tight text-ink">
             오늘의 비즈니스 요약
           </h1>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import { useApp } from "@/lib/store";
 import { BRAND } from "@/lib/brand";
-import { MiraeLockup } from "@/components/MiraeLogo";
+import { MiraeWordmark } from "@/components/MiraeLogo";
 
 function Row({ label, desc, children }: { label: string; desc?: string; children: React.ReactNode }) {
   return (
@@ -100,7 +100,13 @@ export default function SettingsPage() {
         </Row>
       </div>
 
-      <p className="mt-4 text-[17px] text-ink-dim">InsightAI MVP v0.1 · 데모 환경에서는 일부 설정이 저장되지 않습니다.</p>
+      <div className="mt-5 flex flex-col items-center gap-2.5 border-t border-line pt-6 text-center">
+        <MiraeWordmark height={48} />
+        <p className="text-[17px] text-ink-soft">{BRAND.credit}</p>
+        <p className="text-[16px] text-ink-dim">
+          {BRAND.product} MVP v0.1 · 데모 환경에서는 일부 설정이 저장되지 않습니다.
+        </p>
+      </div>
     </>
   );
 }

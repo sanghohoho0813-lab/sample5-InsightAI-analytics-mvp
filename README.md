@@ -18,8 +18,11 @@
 - 보고서: 발행 카드에 로고 + `미래에이아이랩 제작` 배지 (PDF 저장 시에도 포함)
 - 파비콘·메타데이터(`creator`/`publisher`)까지 브랜드 반영
 - 브랜드 색상(#1478ff 블루 / #16bfd6 시안 / #09242d 잉크)을 앱 액센트·차트 팔레트에 적용
-- 원본 자산: `public/brand/*.svg` · 상수: `lib/brand.ts`
-  좁은 영역에서는 워드마크를 축소하면 한글이 뭉개지므로 심볼+텍스트 락업(`MiraeLockup`)을 사용합니다.
+- 원본 자산: 제공받은 로고 파일에서 배경을 제거해 `public/brand/`에 PNG로 보관합니다.
+  - `mirae-ai-lab-logo.png` (가로형 전체, 767×160)
+  - `mirae-ai-lab-symbol.png` (M 심볼, 236×160) — 파비콘(`app/icon.png`)도 이 심볼로 생성
+  - 상수: `lib/brand.ts` · 컴포넌트: `components/MiraeLogo.tsx`
+  - 한글 워드마크는 높이 36px 이상에서 판독되므로, 더 좁은 곳(히어로 배지 등)에는 심볼만 사용합니다.
 
 ## 타이포그래피
 
@@ -103,6 +106,6 @@ components/     MetricCard, InsightCard, AnomalyCard, ForecastCard, MobileHome,
                 NotificationBell, DataTable, UploadPanel, MiraeLogo, AppFooter, charts/ ...
 lib/            analytics-engine, anomaly-engine, forecast-engine,
                 insight-generator, notifications, ai, csv, demo-data, store, brand
-public/brand/   미래에이아이랩 로고 원본 SVG (horizontal, symbol)
+public/brand/   미래에이아이랩 로고 (가로형 전체 · 심볼, 배경 제거 PNG)
 supabase/       schema.sql
 ```

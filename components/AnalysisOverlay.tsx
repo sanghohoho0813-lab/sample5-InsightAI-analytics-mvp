@@ -2,7 +2,7 @@
 
 import { ANALYSIS_STEPS, useApp } from "@/lib/store";
 import { Check, LoaderCircle, Sparkles } from "lucide-react";
-import { MiraeLockup } from "./MiraeLogo";
+import { MiraeWordmark } from "./MiraeLogo";
 
 /** 분석 시작 시 표시되는 단계별 로딩 오버레이 (AI 분석 과정 연출) */
 export default function AnalysisOverlay() {
@@ -45,7 +45,7 @@ export default function AnalysisOverlay() {
           })}
         </ul>
         <div className="mt-6 flex justify-center border-t border-line pt-4">
-          <MiraeLockup size="md" />
+          <MiraeWordmark height={44} />
         </div>
         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-line">
           <div

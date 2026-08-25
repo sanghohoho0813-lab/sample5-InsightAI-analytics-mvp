@@ -12,8 +12,13 @@ export const BRAND = {
     initial: "김",
     role: "데이터 분석팀",
   },
+  /** 제공받은 원본 로고에서 추출한 자산 (배경 제거 완료) */
   logo: {
-    horizontal: "/brand/mirae-ai-lab-horizontal.svg",
-    symbol: "/brand/mirae-ai-lab-symbol.svg",
+    /** 가로형 전체 로고 767×160 */
+    full: "/brand/mirae-ai-lab-logo.png",
+    fullRatio: 767 / 160,
+    /** 심볼(M 마크) 236×160 */
+    symbol: "/brand/mirae-ai-lab-symbol.png",
+    symbolRatio: 236 / 160,
   },
 } as const;

@@ -7,7 +7,7 @@ import { useApp } from "@/lib/store";
 import DateRangePicker from "./DateRangePicker";
 import NotificationBell from "./NotificationBell";
 import Logo from "./Logo";
-import { MiraeLockup } from "./MiraeLogo";
+import { MiraeWordmark } from "./MiraeLogo";
 import { BRAND } from "@/lib/brand";
 
 const TITLES: Record<string, string> = {
@@ -100,7 +100,7 @@ export default function TopBar() {
           </select>
           <span className="ml-auto flex items-center gap-3 whitespace-nowrap">
             <span className="text-[14px] font-bold uppercase tracking-[0.14em] text-ink-dim">built by</span>
-            <MiraeLockup size="sm" />
+            <MiraeWordmark height={36} />
           </span>
         </div>
       )}
@@ -112,7 +112,6 @@ export default function TopBar() {
             <Logo size={30} showText={false} />
           </Link>
           <h1 className="truncate text-[21px] font-bold tracking-tight text-ink">{title}</h1>
-          <MiraeLockup size="sm" className="hidden shrink-0 sm:flex" />
           <div className="ml-auto">
             <NotificationBell />
           </div>

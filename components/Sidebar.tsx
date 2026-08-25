@@ -17,7 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import Logo from "./Logo";
-import { MiraeLockup } from "./MiraeLogo";
+import { MiraeWordmark } from "./MiraeLogo";
 import { BRAND } from "@/lib/brand";
 import { useApp } from "@/lib/store";
 
@@ -47,7 +47,7 @@ export default function Sidebar() {
           <span className="mb-2 block text-[13px] font-bold uppercase tracking-[0.14em] text-ink-dim">
             built by
           </span>
-          <MiraeLockup size="md" />
+          <MiraeWordmark height={52} />
         </span>
       </Link>
 

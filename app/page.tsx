@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, BrainCircuit, LineChart, Sparkles, TrendingUp, Upload } from "lucide-react";
 import Logo from "@/components/Logo";
-import { MiraeLockup } from "@/components/MiraeLogo";
+import { MiraeSymbol, MiraeWordmark } from "@/components/MiraeLogo";
 import { BRAND } from "@/lib/brand";
 import { getDemoDatasets } from "@/lib/demo-data";
 import { useApp } from "@/lib/store";
@@ -28,7 +28,7 @@ export default function Home() {
         <div className="flex items-center gap-3.5">
           <Logo />
           <span className="hidden h-7 w-px bg-line sm:block" />
-          <MiraeLockup size="md" className="hidden sm:flex" />
+          <MiraeWordmark height={44} className="hidden sm:block" />
         </div>
         <Link
           href="/dashboard"
@@ -40,7 +40,8 @@ export default function Home() {
 
       <section className="relative mx-auto max-w-5xl px-5 pb-16 pt-10 text-center md:pt-16">
         <span className="animate-fade-up inline-flex flex-wrap items-center justify-center gap-2.5 rounded-full border border-brand/20 bg-surface px-4 py-2 text-[18px] font-semibold text-brand shadow-sm">
-          <MiraeLockup size="sm" />
+          <MiraeSymbol height={26} />
+          <span className="font-extrabold text-ink">{BRAND.company}</span>
           <span className="h-4 w-px bg-line" />
           <span className="flex items-center gap-1.5">
             <Sparkles className="h-5 w-5" />
@@ -120,7 +121,7 @@ export default function Home() {
 
       <footer className="relative border-t border-line bg-surface">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-5 py-9 text-center">
-          <MiraeLockup size="xl" />
+          <MiraeWordmark height={72} />
           <p className="text-[18px] leading-relaxed text-ink-soft">{BRAND.credit}</p>
           <p className="text-[15px] text-ink-dim">
             © {BRAND.company} · {BRAND.product} {BRAND.productTagline} 데모

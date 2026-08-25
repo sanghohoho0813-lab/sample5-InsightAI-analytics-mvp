@@ -6,7 +6,7 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import { useApp } from "@/lib/store";
 import { BRAND } from "@/lib/brand";
-import { MiraeLockup } from "@/components/MiraeLogo";
+import { MiraeWordmark } from "@/components/MiraeLogo";
 import { channelShares, computeKpis, filterDimensions } from "@/lib/analytics-engine";
 import { detectAnomalies } from "@/lib/anomaly-engine";
 import { computeForecasts } from "@/lib/forecast-engine";
@@ -119,7 +119,7 @@ export default function ReportsPage() {
       <div className="space-y-4">
         <section className="card animate-fade-up flex flex-wrap items-center justify-between gap-4 p-5 md:p-6">
           <div>
-            <MiraeLockup size="lg" />
+            <MiraeWordmark height={56} />
             <p className="mt-2.5 text-[21px] font-bold text-ink">{BRAND.product} AI 분석 보고서</p>
             <p className="mt-1 text-[17px] text-ink-soft">
               {dataset.name} · 최근 {filters.rangeDays}일 · 작성 {BRAND.user.display}
