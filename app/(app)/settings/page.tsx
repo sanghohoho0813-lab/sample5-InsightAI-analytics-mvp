@@ -20,7 +20,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
   return (
     <button
       onClick={() => onChange(!on)}
-      className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${on ? "bg-accent" : "bg-navy-700"}`}
+      className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${on ? "bg-brand" : "bg-line"}`}
       role="switch"
       aria-checked={on}
     >
@@ -39,16 +39,16 @@ export default function SettingsPage() {
   const [retention, setRetention] = useState("12");
 
   const selectCls =
-    "h-9 rounded-xl border border-line bg-navy-850 px-2.5 text-[12.5px] text-ink-soft outline-none transition-colors hover:border-line-strong focus:border-accent";
+    "h-9 rounded-xl border border-line bg-surface-soft px-2.5 text-[12.5px] text-ink-soft outline-none transition-colors hover:border-line-strong focus:border-brand";
 
   return (
     <>
-      <PageHeader title="설정" subtitle="프로필과 분석 기본값을 관리합니다" />
+      <PageHeader subtitle="프로필과 분석 기본값을 관리합니다" />
 
       <div className="card animate-fade-up p-5">
         <h3 className="text-[14px] font-semibold">프로필</h3>
         <div className="mt-3 flex items-center gap-4">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-navy-700 text-lg font-bold text-accent-bright">김</span>
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-line text-lg font-bold text-brand">김</span>
           <div>
             <p className="text-[14px] font-semibold">김대표</p>
             <p className="text-[12px] text-ink-dim">sanghohoho0813@gmail.com · Pro 플랜</p>

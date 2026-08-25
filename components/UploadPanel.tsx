@@ -69,12 +69,12 @@ export default function UploadPanel() {
   if (phase === "reading") {
     return (
       <div className="card p-8 text-center animate-fade-in">
-        <FileSpreadsheet className="mx-auto h-10 w-10 text-accent-bright" />
+        <FileSpreadsheet className="mx-auto h-10 w-10 text-brand" />
         <p className="mt-3 text-[14px] font-semibold">{fileName}</p>
         <p className="mt-1 text-[12px] text-ink-dim">파일을 읽고 있습니다…</p>
-        <div className="mx-auto mt-4 h-1.5 max-w-xs overflow-hidden rounded-full bg-navy-700">
+        <div className="mx-auto mt-4 h-1.5 max-w-xs overflow-hidden rounded-full bg-line">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-accent to-cyan-accent transition-all duration-300"
+            className="h-full rounded-full bg-gradient-to-r from-brand to-brand-dark transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -90,7 +90,7 @@ export default function UploadPanel() {
           <div className="flex-1">
             <p className="text-[14px] font-semibold">업로드에 실패했습니다</p>
             <p className="mt-1 text-[12.5px] text-ink-soft">{result.error}</p>
-            <div className="mt-3 rounded-xl border border-line bg-navy-850 p-3.5 text-[12px] text-ink-dim">
+            <div className="mt-3 rounded-xl border border-line bg-surface-soft p-3.5 text-[12px] text-ink-dim">
               <p className="mb-1.5 font-medium text-ink-soft">지원 컬럼 예시</p>
               <p className="leading-relaxed">{SUPPORTED_COLUMNS.join(" · ")}</p>
               <p className="mt-1.5">필수: Date(YYYY-MM-DD), Revenue · 한글 헤더(날짜, 매출, 주문수…)도 인식합니다.</p>
@@ -112,7 +112,7 @@ export default function UploadPanel() {
       <div className="space-y-4 animate-fade-in">
         <div className="card flex flex-wrap items-center gap-x-6 gap-y-2 p-4">
           <div className="flex items-center gap-3">
-            <FileSpreadsheet className="h-8 w-8 text-accent-bright" />
+            <FileSpreadsheet className="h-8 w-8 text-brand" />
             <div>
               <p className="text-[13.5px] font-semibold">{fileName}</p>
               <p className="text-[11.5px] text-ink-dim">업로드 완료 · 미리보기를 확인한 뒤 분석을 시작하세요</p>
@@ -131,7 +131,7 @@ export default function UploadPanel() {
             </button>
             <button
               onClick={begin}
-              className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-[13px] font-semibold text-white shadow-lg shadow-accent/25 transition-colors hover:bg-accent-bright"
+              className="flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-[13px] font-semibold text-white shadow-lg shadow-brand/25 transition-colors hover:bg-brand-dark"
             >
               <Play className="h-4 w-4" /> 분석 시작
             </button>
@@ -156,17 +156,17 @@ export default function UploadPanel() {
         if (file) handleFile(file);
       }}
       className={`card flex flex-col items-center justify-center border-2 border-dashed p-10 text-center transition-colors duration-300 ${
-        dragOver ? "border-accent bg-accent/5" : "border-line"
+        dragOver ? "border-brand bg-brand-soft" : "border-line"
       }`}
     >
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/12">
-        <CloudUpload className="h-7 w-7 text-accent-bright" />
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-soft">
+        <CloudUpload className="h-7 w-7 text-brand" />
       </span>
       <p className="mt-4 text-[15px] font-semibold">파일을 끌어다 놓거나 선택하세요</p>
       <p className="mt-1 text-[12.5px] text-ink-dim">CSV, XLSX 지원 · 최대 10MB</p>
       <button
         onClick={() => inputRef.current?.click()}
-        className="mt-5 rounded-xl bg-accent px-5 py-2.5 text-[13.5px] font-semibold text-white shadow-lg shadow-accent/25 transition-colors hover:bg-accent-bright"
+        className="mt-5 rounded-xl bg-brand px-5 py-2.5 text-[13.5px] font-semibold text-white shadow-lg shadow-brand/25 transition-colors hover:bg-brand-dark"
       >
         파일 선택
       </button>

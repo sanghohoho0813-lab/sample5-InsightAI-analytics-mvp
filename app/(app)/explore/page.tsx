@@ -50,7 +50,7 @@ export default function ExplorePage() {
   if (!dataset) {
     return (
       <>
-        <PageHeader title="데이터 탐색" subtitle="지표와 차원을 조합해 데이터를 직접 살펴보세요" />
+        <PageHeader subtitle="지표와 차원을 조합해 데이터를 직접 살펴보세요" />
         <EmptyState />
       </>
     );
@@ -64,12 +64,12 @@ export default function ExplorePage() {
 
   const chipCls = (on: boolean) =>
     `rounded-xl px-3.5 py-2 text-[12.5px] font-medium transition-all duration-200 ${
-      on ? "bg-accent text-white shadow-md shadow-accent/25" : "border border-line bg-navy-850 text-ink-dim hover:text-ink-soft"
+      on ? "bg-brand text-white shadow-md shadow-brand/25" : "border border-line bg-surface-soft text-ink-dim hover:text-ink-soft"
     }`;
 
   return (
     <>
-      <PageHeader title="데이터 탐색" subtitle={`${dataset.name} · 지표 × 차원 조합으로 살펴보기`} />
+      <PageHeader subtitle={`${dataset.name} · 지표 × 차원 조합으로 살펴보기`} />
       <FilterBar dataset={dataset} />
 
       <div className="card animate-fade-up p-4 md:p-5">
@@ -161,7 +161,7 @@ export default function ExplorePage() {
               {(() => {
                 const total = series.reduce((a, s) => a + s.value, 0) || 1;
                 return series.map((s) => (
-                  <tr key={s.name} className="border-b border-line/60 last:border-0 hover:bg-navy-850/60">
+                  <tr key={s.name} className="border-b border-line/60 last:border-0 hover:bg-surface-soft">
                     <td className="px-3 py-2.5">{s.name}</td>
                     <td className="tabular px-3 py-2.5 text-right font-medium">{fmt(s.value)}</td>
                     <td className="tabular px-3 py-2.5 text-right text-ink-soft">{isPct ? "—" : `${((s.value / total) * 100).toFixed(1)}%`}</td>

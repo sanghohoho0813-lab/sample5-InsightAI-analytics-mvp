@@ -1,17 +1,21 @@
-import { applyFilters, channelShares, dailySeries, exploreSeries, uniqueDates } from "./analytics-engine";
+import { applyFilters, channelShares, dailySeries, exploreSeries, resolveDates, uniqueDates } from "./analytics-engine";
 import { formatKRW, formatKRWExact } from "./format";
 import { DataRow, Filters, Insight, Recommendation } from "./types";
 
-const baseFilters = (rangeDays: 7 | 30 | 90): Filters => ({ rangeDays, channel: "all", product: "all" });
+export const DEFAULT_FILTERS: Filters = {
+  preset: "30",
+  rangeDays: 30,
+  channel: "all",
+  product: "all",
+};
 
 interface Context {
   rows: DataRow[];
-  rangeDays: 7 | 30 | 90;
+  filters: Filters;
 }
 
 /** 데이터에서 계산된 값 기반으로 규칙형 인사이트를 생성한다. (LLM 연결 시 이 결과를 프롬프트 컨텍스트로 사용) */
-export function generateInsights({ rows, rangeDays }: Context): Insight[] {
-  const filters = baseFilters(rangeDays);
+export function generateInsights({ rows, filters }: Context): Insight[] {
   const insights: Insight[] = [];
   const shares = channelShares(rows, filters);
   const { current, previous, currentDates } = applyFilters(rows, filters);
@@ -81,10 +85,11 @@ export function generateInsights({ rows, rangeDays }: Context): Insight[] {
     });
   }
 
-  // 4) 제품 인사이트: 최근 2주 성장률 최고 상품
-  const dates = uniqueDates(rows);
-  const recent = new Set(dates.slice(-14));
-  const before = new Set(dates.slice(-28, -14));
+  // 4) 제품 인사이트: 선택 기간 내 최근 절반 vs 직전 절반 성장률 최고 상품
+  const { currentDates: scopeDates } = resolveDates(rows, filters);
+  const half = Math.max(1, Math.floor(scopeDates.length / 2));
+  const recent = new Set(scopeDates.slice(-half));
+  const before = new Set(scopeDates.slice(-half * 2, -half));
   const growth = new Map<string, { rec: number; bef: number }>();
   for (const r of rows) {
     if (!growth.has(r.product)) growth.set(r.product, { rec: 0, bef: 0 });
@@ -96,22 +101,23 @@ export function generateInsights({ rows, rangeDays }: Context): Insight[] {
     .map(([product, g]) => ({ product, pct: g.bef > 0 ? ((g.rec - g.bef) / g.bef) * 100 : 0, rec: g.rec }))
     .sort((a, b) => b.pct - a.pct);
   const topProduct = productGrowth[0];
+  const growthLabel = `최근 ${half}일`;
   if (topProduct && topProduct.pct > 5) {
     insights.push({
       id: "product-growth",
       category: "제품 인사이트",
-      title: `'${topProduct.product}' 판매 증가율 최근 2주 1위`,
-      description: `'${topProduct.product}'의 매출이 직전 2주 대비 ${topProduct.pct.toFixed(0)}% 증가하며 가장 빠르게 성장하고 있습니다.`,
-      detail: `최근 2주 매출은 ${formatKRW(topProduct.rec)}입니다. 수요 증가 속도를 고려해 재고와 노출 지면을 미리 확보하는 것이 좋습니다.`,
+      title: `'${topProduct.product}' 판매 증가율 ${growthLabel} 1위`,
+      description: `'${topProduct.product}'의 매출이 직전 ${half}일 대비 ${topProduct.pct.toFixed(0)}% 증가하며 가장 빠르게 성장하고 있습니다.`,
+      detail: `${growthLabel} 매출은 ${formatKRW(topProduct.rec)}입니다. 수요 증가 속도를 고려해 재고와 노출 지면을 미리 확보하는 것이 좋습니다.`,
       impact: "positive",
     });
   }
 
   // 5) 전환율 추세
   const daily = dailySeries(current, currentDates);
-  const half = Math.floor(daily.length / 2);
-  const convA = daily.slice(0, half).reduce((a, p) => a + p.conversionRate, 0) / Math.max(1, half);
-  const convB = daily.slice(half).reduce((a, p) => a + p.conversionRate, 0) / Math.max(1, daily.length - half);
+  const mid = Math.floor(daily.length / 2);
+  const convA = daily.slice(0, mid).reduce((a, p) => a + p.conversionRate, 0) / Math.max(1, mid);
+  const convB = daily.slice(mid).reduce((a, p) => a + p.conversionRate, 0) / Math.max(1, daily.length - mid);
   const convDelta = convA > 0 ? ((convB - convA) / convA) * 100 : 0;
   if (Math.abs(convDelta) >= 3) {
     insights.push({
@@ -188,7 +194,7 @@ export function generateRecommendations(ctx: Context): Recommendation[] {
 /** 자연어 질의 데모 엔진: 질문 키워드를 해석해 실제 데이터를 계산해 답한다. */
 export function answerDataQuestion(question: string, rows: DataRow[]): string {
   const q = question.toLowerCase();
-  const filters = baseFilters(30);
+  const filters = DEFAULT_FILTERS;
   const shares = channelShares(rows, filters);
   const { current, previous } = applyFilters(rows, filters);
   const curRev = current.reduce((a, r) => a + r.revenue, 0);

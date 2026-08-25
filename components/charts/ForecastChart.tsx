@@ -28,18 +28,18 @@ export default function ForecastChart({ summary, height = 260 }: { summary: Fore
   return (
     <div style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke="#122544" strokeDasharray="3 6" vertical={false} />
-          <XAxis dataKey="date" tickFormatter={formatDateShort} axisLine={false} tickLine={false} minTickGap={26} dy={6} />
+        <ComposedChart data={data} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="#f1f5f9" vertical={false} />
+          <XAxis dataKey="date" tickFormatter={formatDateShort} axisLine={false} tickLine={false} minTickGap={26} dy={8} />
           <YAxis tickFormatter={axisFmt} axisLine={false} tickLine={false} width={58} domain={["auto", "auto"]} />
           <Tooltip
             content={({ active, payload, label }) => {
               if (!active || !payload?.length) return null;
               const p = payload[0].payload as ForecastPoint & { band: number | null };
               const rows: { name: string; value: string; color?: string }[] = [];
-              if (p.value != null) rows.push({ name: "실측", value: fmt(p.value), color: "#3b82f6" });
+              if (p.value != null) rows.push({ name: "실측", value: fmt(p.value), color: "#2563eb" });
               if (p.forecast != null && p.value == null) {
-                rows.push({ name: "예상", value: fmt(p.forecast), color: "#22d3ee" });
+                rows.push({ name: "예상", value: fmt(p.forecast), color: "#2dd4bf" });
                 if (p.lower != null && p.upper != null)
                   rows.push({ name: "예상 범위", value: `${fmt(p.lower)} ~ ${fmt(p.upper)}` });
               }
@@ -47,24 +47,24 @@ export default function ForecastChart({ summary, height = 260 }: { summary: Fore
             }}
           />
           <Area dataKey="lower" stackId="band" stroke="none" fill="transparent" animationDuration={600} />
-          <Area dataKey="band" stackId="band" stroke="none" fill="#22d3ee" fillOpacity={0.1} animationDuration={600} />
+          <Area dataKey="band" stackId="band" stroke="none" fill="#2dd4bf" fillOpacity={0.14} animationDuration={600} />
           <Line
             type="monotone"
             dataKey="value"
-            stroke="#3b82f6"
+            stroke="#2563eb"
             strokeWidth={2.2}
             dot={false}
-            activeDot={{ r: 4, fill: "#60a5fa", stroke: "#0a1628", strokeWidth: 2 }}
+            activeDot={{ r: 4.5, fill: "#2563eb", stroke: "#ffffff", strokeWidth: 2.5 }}
             animationDuration={700}
           />
           <Line
             type="monotone"
             dataKey="forecast"
-            stroke="#22d3ee"
-            strokeWidth={2}
+            stroke="#2dd4bf"
+            strokeWidth={2.2}
             strokeDasharray="5 4"
             dot={false}
-            activeDot={{ r: 4, fill: "#22d3ee", stroke: "#0a1628", strokeWidth: 2 }}
+            activeDot={{ r: 4.5, fill: "#2dd4bf", stroke: "#ffffff", strokeWidth: 2.5 }}
             animationDuration={700}
           />
         </ComposedChart>

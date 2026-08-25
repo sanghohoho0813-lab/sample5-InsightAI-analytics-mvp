@@ -38,7 +38,7 @@ export default function AnalyticsPage() {
   if (!dataset || !data) {
     return (
       <>
-        <PageHeader title="분석" subtitle="지난 기간 동안 가장 큰 변화가 있었던 지표입니다" />
+        <PageHeader subtitle="지난 기간 동안 가장 큰 변화가 있었던 지표입니다" />
         <EmptyState />
       </>
     );
@@ -48,7 +48,7 @@ export default function AnalyticsPage() {
 
   return (
     <>
-      <PageHeader title="분석" subtitle={`${dataset.name} · 최근 ${filters.rangeDays}일 상세 분석`} showReportCta />
+      <PageHeader subtitle={`${dataset.name} · 최근 ${filters.rangeDays}일 상세 분석`} />
       <FilterBar dataset={dataset} />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">

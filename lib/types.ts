@@ -113,8 +113,22 @@ export interface AnalysisRecord {
   datasetId: string;
 }
 
+export type RangePreset = "7" | "30" | "90" | "custom";
+
 export interface Filters {
-  rangeDays: 7 | 30 | 90;
+  preset: RangePreset;
+  rangeDays: number; // 프리셋 기간(일). custom일 때는 선택 구간 길이
+  range?: { start: string; end: string }; // preset === "custom"일 때만 사용
   channel: string; // "all" | channel명
   product: string; // "all" | product명
+}
+
+export interface NotificationItem {
+  id: string;
+  severity: Severity;
+  title: string;
+  description: string;
+  date: string;
+  metric: string;
+  read: boolean;
 }

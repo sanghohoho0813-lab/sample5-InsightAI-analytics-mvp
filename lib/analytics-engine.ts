@@ -4,16 +4,45 @@ export function uniqueDates(rows: DataRow[]): string[] {
   return Array.from(new Set(rows.map((r) => r.date))).sort();
 }
 
+/** 채널·상품 차원 필터만 적용 (기간 무관) */
+export function filterDimensions(rows: DataRow[], filters: Filters): DataRow[] {
+  return rows.filter(
+    (r) =>
+      (filters.channel === "all" || r.channel === filters.channel) &&
+      (filters.product === "all" || r.product === filters.product)
+  );
+}
+
+/** 필터의 기간(프리셋 또는 커스텀 구간)에 해당하는 날짜 목록 */
+export function resolveDates(rows: DataRow[], filters: Filters): {
+  currentDates: string[];
+  previousDates: string[];
+} {
+  const dates = uniqueDates(rows);
+  if (dates.length === 0) return { currentDates: [], previousDates: [] };
+
+  let currentDates: string[];
+  if (filters.preset === "custom" && filters.range) {
+    const { start, end } = filters.range;
+    currentDates = dates.filter((d) => d >= start && d <= end);
+    if (currentDates.length === 0) currentDates = dates.slice(-Math.min(filters.rangeDays, dates.length));
+  } else {
+    currentDates = dates.slice(-Math.min(filters.rangeDays, dates.length));
+  }
+
+  // 이전 기간 = 현재 구간 직전의 동일 길이 구간
+  const firstIdx = dates.indexOf(currentDates[0]);
+  const previousDates = dates.slice(Math.max(0, firstIdx - currentDates.length), firstIdx);
+  return { currentDates, previousDates };
+}
+
 export function applyFilters(rows: DataRow[], filters: Filters): {
   current: DataRow[];
   previous: DataRow[];
   currentDates: string[];
   previousDates: string[];
 } {
-  const dates = uniqueDates(rows);
-  const n = Math.min(filters.rangeDays, dates.length);
-  const currentDates = dates.slice(-n);
-  const previousDates = dates.slice(-(n * 2), -n);
+  const { currentDates, previousDates } = resolveDates(rows, filters);
   const dimOk = (r: DataRow) =>
     (filters.channel === "all" || r.channel === filters.channel) &&
     (filters.product === "all" || r.product === filters.product);

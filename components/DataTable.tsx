@@ -18,7 +18,7 @@ export default function DataTable({ rows }: { rows: DataRow[] }) {
       <div className="overflow-x-auto rounded-xl border border-line">
         <table className="w-full min-w-[820px] text-[12.5px]">
           <thead>
-            <tr className="border-b border-line bg-navy-850 text-left text-[11.5px] uppercase tracking-wide text-ink-dim">
+            <tr className="border-b border-line bg-surface-soft text-left text-[11.5px] uppercase tracking-wide text-ink-dim">
               <th className="px-3.5 py-2.5 font-medium">Date</th>
               <th className="px-3.5 py-2.5 font-medium">Channel</th>
               <th className="px-3.5 py-2.5 font-medium">Product</th>
@@ -31,7 +31,7 @@ export default function DataTable({ rows }: { rows: DataRow[] }) {
           </thead>
           <tbody>
             {view.map((r, i) => (
-              <tr key={`${r.date}-${r.channel}-${r.product}-${i}`} className="border-b border-line/60 transition-colors last:border-0 hover:bg-navy-850/60">
+              <tr key={`${r.date}-${r.channel}-${r.product}-${i}`} className="border-b border-line/60 transition-colors last:border-0 hover:bg-surface-soft">
                 <td className="tabular px-3.5 py-2.5 text-ink-soft">{r.date}</td>
                 <td className="px-3.5 py-2.5">{r.channel}</td>
                 <td className="px-3.5 py-2.5 text-ink-soft">{r.product}</td>

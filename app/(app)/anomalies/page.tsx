@@ -17,21 +17,21 @@ const SEVERITY_LABEL: Record<Severity, string> = {
 const SEVERITY_DOT: Record<Severity, string> = {
   critical: "bg-negative",
   warning: "bg-warning",
-  info: "bg-accent",
+  info: "bg-brand",
 };
 
 export default function AnomaliesPage() {
   const { dataset, filters } = useApp();
 
   const anomalies = useMemo(
-    () => (dataset ? detectAnomalies(dataset.rows, filters.rangeDays) : []),
+    () => (dataset ? detectAnomalies(dataset.rows, filters) : []),
     [dataset, filters.rangeDays]
   );
 
   if (!dataset) {
     return (
       <>
-        <PageHeader title="이상징후" subtitle="비정상 변화를 자동으로 감지합니다" />
+        <PageHeader subtitle="비정상 변화를 자동으로 감지합니다" />
         <EmptyState />
       </>
     );
@@ -44,7 +44,7 @@ export default function AnomaliesPage() {
 
   return (
     <>
-      <PageHeader title="이상징후" subtitle={`${dataset.name} · 최근 ${filters.rangeDays}일에서 감지된 비정상 변화`} />
+      <PageHeader subtitle={`${dataset.name} · 최근 ${filters.rangeDays}일에서 감지된 비정상 변화`} />
       <FilterBar dataset={dataset} />
 
       <div className="mb-4 flex flex-wrap gap-2">

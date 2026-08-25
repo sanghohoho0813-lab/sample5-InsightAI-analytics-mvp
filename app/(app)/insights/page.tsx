@@ -17,7 +17,7 @@ export default function InsightsPage() {
 
   const data = useMemo(() => {
     if (!dataset) return null;
-    const ctx = { rows: dataset.rows, rangeDays: filters.rangeDays };
+    const ctx = { rows: dataset.rows, filters };
     return {
       insights: generateInsights(ctx),
       recommendations: generateRecommendations(ctx),
@@ -27,7 +27,7 @@ export default function InsightsPage() {
   if (!dataset || !data) {
     return (
       <>
-        <PageHeader title="AI 인사이트" subtitle="AI가 발견한 핵심 인사이트입니다" />
+        <PageHeader subtitle="AI가 발견한 핵심 인사이트입니다" />
         <EmptyState />
       </>
     );
@@ -35,12 +35,12 @@ export default function InsightsPage() {
 
   return (
     <>
-      <PageHeader title="AI 인사이트" subtitle={`${dataset.name} · AI가 발견한 핵심 인사이트입니다`} showReportCta />
+      <PageHeader subtitle={`${dataset.name} · AI가 발견한 핵심 인사이트입니다`} />
       <FilterBar dataset={dataset} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
         <section>
-          <SectionHeader title="핵심 인사이트" icon={<Sparkles className="h-4 w-4 text-accent-bright" />} />
+          <SectionHeader title="핵심 인사이트" icon={<Sparkles className="h-4 w-4 text-brand" />} />
           <div className="space-y-2.5">
             {data.insights.length === 0 ? (
               <div className="card p-6 text-center text-[13px] text-ink-dim">
@@ -52,7 +52,7 @@ export default function InsightsPage() {
           </div>
 
           <div className="card mt-4 flex items-center gap-3.5 p-4 animate-fade-up">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-cyan-accent shadow-lg shadow-accent/30">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-dark shadow-lg shadow-brand/30">
               <Bot className="h-5 w-5 text-white" />
             </span>
             <div className="min-w-0 flex-1">
@@ -61,7 +61,7 @@ export default function InsightsPage() {
             </div>
             <Link
               href="/ai"
-              className="shrink-0 rounded-xl bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-accent-bright"
+              className="shrink-0 rounded-xl bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-brand-dark"
             >
               AI 질의
             </Link>

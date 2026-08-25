@@ -5,7 +5,7 @@ import { FileText, LoaderCircle, Sparkles } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import { useApp } from "@/lib/store";
-import { channelShares, computeKpis } from "@/lib/analytics-engine";
+import { channelShares, computeKpis, filterDimensions } from "@/lib/analytics-engine";
 import { detectAnomalies } from "@/lib/anomaly-engine";
 import { computeForecasts } from "@/lib/forecast-engine";
 import { generateInsights, generateRecommendations } from "@/lib/insight-generator";
@@ -17,7 +17,7 @@ export default function ReportsPage() {
 
   const report = useMemo(() => {
     if (!dataset) return null;
-    const ctx = { rows: dataset.rows, rangeDays: filters.rangeDays };
+    const ctx = { rows: dataset.rows, filters };
     const kpis = computeKpis(dataset.rows, filters);
     const revenue = kpis.find((k) => k.key === "revenue")!;
     const shares = channelShares(dataset.rows, filters);
@@ -26,8 +26,8 @@ export default function ReportsPage() {
       revenue,
       topChannel: shares[0],
       insights: generateInsights(ctx),
-      anomalies: detectAnomalies(dataset.rows, filters.rangeDays).slice(0, 4),
-      forecasts: computeForecasts(dataset.rows),
+      anomalies: detectAnomalies(dataset.rows, filters).slice(0, 4),
+      forecasts: computeForecasts(filterDimensions(dataset.rows, filters)),
       recommendations: generateRecommendations(ctx),
     };
   }, [dataset, filters]);
@@ -35,7 +35,7 @@ export default function ReportsPage() {
   if (!dataset || !report) {
     return (
       <>
-        <PageHeader title="보고서" subtitle="AI 분석 내용을 한 번에 정리합니다" />
+        <PageHeader subtitle="AI 분석 내용을 한 번에 정리합니다" />
         <EmptyState />
       </>
     );
@@ -52,10 +52,10 @@ export default function ReportsPage() {
   if (phase === "idle") {
     return (
       <>
-        <PageHeader title="보고서" subtitle={`${dataset.name} · AI 분석 내용을 한 번에 정리합니다`} />
+        <PageHeader subtitle={`${dataset.name} · AI 분석 내용을 한 번에 정리합니다`} />
         <div className="card flex flex-col items-center px-6 py-16 text-center animate-fade-up">
-          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/12">
-            <FileText className="h-8 w-8 text-accent-bright" />
+          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-soft">
+            <FileText className="h-8 w-8 text-brand" />
           </span>
           <h2 className="mt-5 text-lg font-bold">AI 분석 보고서</h2>
           <p className="mt-1.5 max-w-md text-[13px] leading-relaxed text-ink-soft">
@@ -64,7 +64,7 @@ export default function ReportsPage() {
           </p>
           <button
             onClick={generate}
-            className="mt-6 flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-[14px] font-semibold text-white shadow-xl shadow-accent/30 transition-colors hover:bg-accent-bright"
+            className="mt-6 flex items-center gap-2 rounded-xl bg-brand px-6 py-3 text-[14px] font-semibold text-white shadow-xl shadow-brand/30 transition-colors hover:bg-brand-dark"
           >
             <Sparkles className="h-4.5 w-4.5" />
             보고서 생성
@@ -77,9 +77,9 @@ export default function ReportsPage() {
   if (phase === "generating") {
     return (
       <>
-        <PageHeader title="보고서" subtitle="보고서를 생성하고 있습니다" />
+        <PageHeader subtitle="보고서를 생성하고 있습니다" />
         <div className="card flex flex-col items-center px-6 py-16 text-center animate-fade-in">
-          <LoaderCircle className="h-8 w-8 animate-spin text-accent-bright" />
+          <LoaderCircle className="h-8 w-8 animate-spin text-brand" />
           <p className="mt-4 text-[14px] font-semibold">AI가 보고서를 작성하고 있습니다…</p>
           <p className="mt-1 text-[12px] text-ink-dim">핵심 변화와 제안을 정리하는 중입니다.</p>
         </div>
@@ -94,14 +94,12 @@ export default function ReportsPage() {
 
   const sectionTitle = "mb-3 flex items-center gap-2 text-[15px] font-bold";
   const num = (n: number) => (
-    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/15 text-[11.5px] font-bold text-accent-bright">{n}</span>
+    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-soft text-[11.5px] font-bold text-brand">{n}</span>
   );
 
   return (
     <>
-      <PageHeader
-        title="보고서"
-        subtitle={`${dataset.name} · 최근 ${filters.rangeDays}일`}
+      <PageHeader subtitle={`${dataset.name} · 최근 ${filters.rangeDays}일`}
         actions={
           <button
             onClick={() => showToast("PDF 내보내기는 정식 버전에서 제공됩니다.", "info")}
@@ -161,8 +159,8 @@ export default function ReportsPage() {
           <h2 className={sectionTitle}>{num(3)} 주요 변화</h2>
           <ul className="space-y-2.5">
             {report.insights.map((ins) => (
-              <li key={ins.id} className="rounded-xl border border-line bg-navy-850 p-3.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-accent-bright">{ins.category}</p>
+              <li key={ins.id} className="rounded-xl border border-line bg-surface-soft p-3.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-brand">{ins.category}</p>
                 <p className="mt-0.5 text-[13px] font-semibold">{ins.title}</p>
                 <p className="mt-0.5 text-[12.5px] leading-relaxed text-ink-soft">{ins.description}</p>
               </li>
@@ -180,7 +178,7 @@ export default function ReportsPage() {
                 <li key={a.id} className="flex items-start gap-2.5 text-[12.5px]">
                   <span
                     className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
-                      a.severity === "critical" ? "bg-negative" : a.severity === "warning" ? "bg-warning" : "bg-accent"
+                      a.severity === "critical" ? "bg-negative" : a.severity === "warning" ? "bg-warning" : "bg-brand"
                     }`}
                   />
                   <span className="text-ink-soft"><b className="text-ink">{a.title}</b> — {a.description}</span>
@@ -194,7 +192,7 @@ export default function ReportsPage() {
           <h2 className={sectionTitle}>{num(5)} 예측</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {report.forecasts.map((f) => (
-              <div key={f.key} className="rounded-xl border border-line bg-navy-850 p-3.5">
+              <div key={f.key} className="rounded-xl border border-line bg-surface-soft p-3.5">
                 <p className="text-[11.5px] text-ink-dim">{f.label} · 다음 7일</p>
                 <p className="mt-1 text-[17px] font-bold">
                   {f.format === "currency" ? formatKRW(f.next7Total) : f.next7Total.toLocaleString("ko-KR")}
@@ -211,7 +209,7 @@ export default function ReportsPage() {
           <h2 className={sectionTitle}>{num(6)} AI Recommendation</h2>
           <ul className="space-y-2.5">
             {report.recommendations.map((r) => (
-              <li key={r.id} className="rounded-xl border border-line bg-navy-850 p-3.5">
+              <li key={r.id} className="rounded-xl border border-line bg-surface-soft p-3.5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[13px] font-semibold">{r.title}</p>
                   <span className="shrink-0 text-[12px] font-bold text-positive">{r.expectedEffect}</span>

@@ -1,6 +1,6 @@
-import { dailySeries, uniqueDates } from "./analytics-engine";
+import { dailySeries, filterDimensions, resolveDates } from "./analytics-engine";
 import { formatDateKR } from "./format";
-import { Anomaly, DataRow, Severity } from "./types";
+import { Anomaly, DataRow, Filters, Severity } from "./types";
 
 interface MetricDef {
   key: "revenue" | "visitors" | "orders" | "conversionRate" | "aov";
@@ -35,9 +35,14 @@ function severityFor(deltaPct: number, isNegative: boolean): Severity {
  * 2) 최근 7일 평균 대비 ±2 표준편차 이탈
  * 채널 단위 시리즈에 대해 검사해 원인 채널까지 표시한다.
  */
-export function detectAnomalies(rows: DataRow[], rangeDays: number): Anomaly[] {
-  const dates = uniqueDates(rows).slice(-rangeDays);
-  const channels = Array.from(new Set(rows.map((r) => r.channel)));
+export function detectAnomalies(rows: DataRow[], filters: Filters): Anomaly[] {
+  // 상품 필터는 반영하고, 채널은 원인 채널을 찾기 위해 전 채널을 스캔한다.
+  const scoped = filterDimensions(rows, { ...filters, channel: "all" });
+  const { currentDates: dates } = resolveDates(rows, filters);
+  const channels =
+    filters.channel === "all"
+      ? Array.from(new Set(scoped.map((r) => r.channel)))
+      : [filters.channel];
   const anomalies: Anomaly[] = [];
 
   const scan = (scope: string, series: ReturnType<typeof dailySeries>) => {
@@ -76,9 +81,11 @@ export function detectAnomalies(rows: DataRow[], rangeDays: number): Anomaly[] {
     }
   };
 
-  scan("전체", dailySeries(rows.filter((r) => dates.includes(r.date)), dates));
+  const dateSet = new Set(dates);
+  const windowRows = scoped.filter((r) => dateSet.has(r.date));
+  if (filters.channel === "all") scan("전체", dailySeries(windowRows, dates));
   for (const ch of channels) {
-    scan(ch, dailySeries(rows.filter((r) => r.channel === ch && dates.includes(r.date)), dates));
+    scan(ch, dailySeries(windowRows.filter((r) => r.channel === ch), dates));
   }
 
   // 심각도 → 최신순 정렬 후 중복(같은 날짜·지표) 축약

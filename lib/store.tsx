@@ -19,11 +19,15 @@ interface AppState {
   filters: Filters;
   history: AnalysisRecord[];
   toasts: ToastMsg[];
+  readIds: string[];
   setFilters: (f: Partial<Filters>) => void;
+  setPreset: (preset: "7" | "30" | "90") => void;
+  setCustomRange: (start: string, end: string) => void;
   startAnalysis: (dataset: DemoDataset, navigateTo?: string) => void;
   openAnalysis: (record: AnalysisRecord) => void;
   showToast: (message: string, type?: ToastMsg["type"]) => void;
   dismissToast: (id: number) => void;
+  markRead: (ids: string[]) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -37,6 +41,14 @@ export const ANALYSIS_STEPS = [
 
 const HISTORY_KEY = "insightai.history";
 const ACTIVE_KEY = "insightai.activeDataset";
+const READ_KEY = "insightai.readNotifications";
+
+const DEFAULT_FILTERS: Filters = {
+  preset: "30",
+  rangeDays: 30,
+  channel: "all",
+  product: "all",
+};
 
 /** 새로고침/직접 진입에도 분석 상태가 유지되도록 활성 데이터셋을 저장 */
 function persistActiveDataset(ds: DemoDataset) {
@@ -64,36 +76,41 @@ function restoreActiveDataset(): DemoDataset | null {
   return null;
 }
 
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJson(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // localStorage 사용 불가 환경 무시
+  }
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [dataset, setDataset] = useState<DemoDataset | null>(null);
   const [analyzed, setAnalyzed] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(0);
-  const [filters, setFiltersState] = useState<Filters>({ rangeDays: 30, channel: "all", product: "all" });
+  const [filters, setFiltersState] = useState<Filters>(DEFAULT_FILTERS);
   const [history, setHistory] = useState<AnalysisRecord[]>([]);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
+  const [readIds, setReadIds] = useState<string[]>([]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(HISTORY_KEY);
-      if (raw) setHistory(JSON.parse(raw));
-    } catch {
-      // 저장된 기록이 없거나 손상된 경우 무시
-    }
+    setHistory(readJson<AnalysisRecord[]>(HISTORY_KEY, []));
+    setReadIds(readJson<string[]>(READ_KEY, []));
     const restored = restoreActiveDataset();
     if (restored) {
       setDataset(restored);
       setAnalyzed(true);
-    }
-  }, []);
-
-  const persistHistory = useCallback((records: AnalysisRecord[]) => {
-    setHistory(records);
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(records.slice(0, 20)));
-    } catch {
-      // localStorage 사용 불가 환경 무시
     }
   }, []);
 
@@ -111,6 +128,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setFiltersState((prev) => ({ ...prev, ...f }));
   }, []);
 
+  const setPreset = useCallback((preset: "7" | "30" | "90") => {
+    setFiltersState((prev) => ({ ...prev, preset, rangeDays: Number(preset), range: undefined }));
+  }, []);
+
+  const setCustomRange = useCallback((start: string, end: string) => {
+    const days =
+      Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1;
+    setFiltersState((prev) => ({
+      ...prev,
+      preset: "custom",
+      range: { start, end },
+      rangeDays: Math.max(1, days),
+    }));
+  }, []);
+
+  const markRead = useCallback((ids: string[]) => {
+    setReadIds((prev) => {
+      const next = Array.from(new Set([...prev, ...ids])).slice(-200);
+      writeJson(READ_KEY, next);
+      return next;
+    });
+  }, []);
+
   const startAnalysis = useCallback(
     (ds: DemoDataset, navigateTo = "/dashboard") => {
       setAnalyzing(true);
@@ -122,8 +162,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setDataset(ds);
         setAnalyzed(true);
         persistActiveDataset(ds);
-        setAnalyzing(false);
-        setFiltersState({ rangeDays: 30, channel: "all", product: "all" });
+        setFiltersState(DEFAULT_FILTERS);
         const record: AnalysisRecord = {
           id: `an-${Date.now()}`,
           name: `${ds.name} 분석`,
@@ -137,13 +176,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
         setHistory((prev) => {
           const next = [record, ...prev].slice(0, 20);
-          try {
-            localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-          } catch {
-            // ignore
-          }
+          writeJson(HISTORY_KEY, next);
           return next;
         });
+        setAnalyzing(false);
         router.push(navigateTo);
         showToast("분석이 완료되었습니다.", "success");
       }, 3300);
@@ -176,13 +212,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       filters,
       history,
       toasts,
+      readIds,
       setFilters,
+      setPreset,
+      setCustomRange,
       startAnalysis,
       openAnalysis,
       showToast,
       dismissToast,
+      markRead,
     }),
-    [dataset, analyzed, analyzing, analysisStep, filters, history, toasts, setFilters, startAnalysis, openAnalysis, showToast, dismissToast]
+    [dataset, analyzed, analyzing, analysisStep, filters, history, toasts, readIds,
+     setFilters, setPreset, setCustomRange, startAnalysis, openAnalysis, showToast, dismissToast, markRead]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

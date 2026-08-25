@@ -1,5 +1,5 @@
 import { answerDataQuestion, generateInsights, generateRecommendations } from "./insight-generator";
-import { DataRow, Insight, Recommendation } from "./types";
+import { DataRow, Filters, Insight, Recommendation } from "./types";
 
 /**
  * AI Layer — 외부 LLM API 연결 지점.
@@ -25,15 +25,15 @@ async function tryRemote(payload: object): Promise<string | null> {
   }
 }
 
-export async function generateInsight(rows: DataRow[], rangeDays: 7 | 30 | 90): Promise<Insight[]> {
-  return generateInsights({ rows, rangeDays });
+export async function generateInsight(rows: DataRow[], filters: Filters): Promise<Insight[]> {
+  return generateInsights({ rows, filters });
 }
 
 export async function generateRecommendation(
   rows: DataRow[],
-  rangeDays: 7 | 30 | 90
+  filters: Filters
 ): Promise<Recommendation[]> {
-  return generateRecommendations({ rows, rangeDays });
+  return generateRecommendations({ rows, filters });
 }
 
 export async function askDataQuestion(question: string, rows: DataRow[]): Promise<string> {
