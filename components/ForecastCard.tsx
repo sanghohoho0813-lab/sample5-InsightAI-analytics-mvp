@@ -27,19 +27,19 @@ export default function ForecastCard({
       className={`card card-hover animate-fade-up ${compact ? "p-3.5" : "p-4 md:p-[18px]"}`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <p className="text-[12px] font-medium text-ink-soft">{summary.label}</p>
-      <p className="mt-0.5 text-[10.5px] text-ink-dim">다음 7일 · AI Forecast</p>
-      <p className={`mt-2 font-bold leading-tight tracking-tight text-ink ${compact ? "text-[17px]" : "text-[22px]"}`}>
+      <p className="text-[18px] font-medium text-ink-soft">{summary.label}</p>
+      <p className="mt-0.5 whitespace-nowrap text-[15px] text-ink-dim">{compact ? "다음 7일 예상" : "다음 7일 · AI Forecast"}</p>
+      <p className={`mt-2 whitespace-nowrap font-bold leading-tight tracking-tight text-ink ${compact ? "text-[24px]" : "text-[31px]"}`}>
         <CountUp value={summary.next7Total} format={fmt} />
       </p>
-      <div className="mt-1 flex items-center gap-1.5 text-[11.5px]">
+      <div className="mt-1 flex items-center gap-1.5 text-[17px]">
         <span className={`font-bold ${up ? "text-positive" : "text-negative"}`}>
           {up ? "▲" : "▼"} {Math.abs(summary.changePct).toFixed(1)}%
         </span>
         {!compact && <span className="text-ink-dim">최근 7일 대비</span>}
       </div>
       <div className="mt-2.5">
-        <Sparkline data={spark} color="#2563eb" width={120} height={compact ? 26 : 32} />
+        <Sparkline data={spark} color="#1478ff" width={120} height={compact ? 26 : 32} />
       </div>
     </div>
   );

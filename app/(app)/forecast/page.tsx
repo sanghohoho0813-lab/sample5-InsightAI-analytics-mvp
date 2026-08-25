@@ -51,8 +51,8 @@ export default function ForecastPage() {
       <div className="card card-hover mt-4 animate-fade-up p-4 md:p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-[15px] font-semibold">{current.label} · 다음 7일</h3>
-            <div className="mt-1 flex items-center gap-3 text-[11.5px] text-ink-dim">
+            <h3 className="text-[22.5px] font-semibold">{current.label} · 다음 7일</h3>
+            <div className="mt-1 flex items-center gap-3 text-[17px] text-ink-dim">
               <span className="flex items-center gap-1.5"><span className="h-[3px] w-4 rounded-full bg-brand" /> 실측</span>
               <span className="flex items-center gap-1.5"><span className="h-[3px] w-4 rounded-full bg-aqua" /> AI Forecast</span>
               <span className="flex items-center gap-1.5"><span className="h-2.5 w-4 rounded bg-aqua/15" /> 예상 범위</span>
@@ -62,8 +62,8 @@ export default function ForecastPage() {
         <ForecastChart summary={current} height={320} />
       </div>
 
-      <div className="card mt-4 flex items-start gap-3 p-4 text-[12px] leading-relaxed text-ink-dim animate-fade-up">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+      <div className="card mt-4 flex items-start gap-3 p-4 text-[18px] leading-relaxed text-ink-dim animate-fade-up">
+        <Info className="mt-0.5 h-6 w-6 shrink-0 text-brand" />
         <p>
           예상 수치는 최근 14일 이동평균과 성장률을 반영한 추정치입니다. 실제 결과는
           프로모션, 시즌 요인 등에 따라 달라질 수 있으며, 예상 범위는 최근 변동성을 기준으로 계산됩니다.

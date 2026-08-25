@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="미래에이아이랩 심볼">
-  <rect width="512" height="512" rx="96" fill="#ffffff"/>
+  <rect width="512" height="512" fill="none"/>
   <defs>
     <linearGradient id="mark" x1="92" y1="112" x2="430" y2="412" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#006b78"/>

@@ -1,10 +1,31 @@
 # InsightAI — AI 데이터 분석·예측 반응형 SaaS MVP
 
+> **미래에이아이랩(MIRAE AI LAB) 제작 레퍼런스**
+
 데이터를 업로드하면 AI가 **핵심 KPI → 이상징후 → 추세 → 예측 → 인사이트 → 실행 제안**까지
 한 번에 정리해주는 데이터 인사이트 SaaS MVP입니다.
 
 첨부 디자인 레퍼런스를 기준으로 한 **라이트 Analytics UI**(화이트 카드 + Electric Blue 액센트)이며,
 데스크톱 고밀도 대시보드와 모바일 전용 홈(오늘의 비즈니스 요약) + 하단 네비게이션(중앙 AI 버튼)을 모두 지원합니다.
+
+## 브랜딩
+
+제작 주체가 한눈에 드러나도록 미래에이아이랩 아이덴티티를 전 화면에 배치했습니다.
+
+- 랜딩: 헤더 코브랜드 · 히어로 배지 · CTA 하단 문구 · 푸터 크레딧
+- 앱: 사이드바 `BUILT BY` 락업, 상단 툴바 우측 표기, 모든 화면 하단 크레딧
+- 사용자: **미래에이아이랩 김팀장님** (사이드바·툴바·설정·보고서 작성자)
+- 보고서: 발행 카드에 로고 + `미래에이아이랩 제작` 배지 (PDF 저장 시에도 포함)
+- 파비콘·메타데이터(`creator`/`publisher`)까지 브랜드 반영
+- 브랜드 색상(#1478ff 블루 / #16bfd6 시안 / #09242d 잉크)을 앱 액센트·차트 팔레트에 적용
+- 원본 자산: `public/brand/*.svg` · 상수: `lib/brand.ts`
+  좁은 영역에서는 워드마크를 축소하면 한글이 뭉개지므로 심볼+텍스트 락업(`MiraeLockup`)을 사용합니다.
+
+## 타이포그래피
+
+전 화면 폰트를 기존 대비 **1.5배**로 확대했습니다(본문 12→18px, KPI 값 22→33px 등).
+이에 맞춰 사이드바 폭(292px), 2행 상단 툴바, 차트 축 폭·폰트, 아이콘 크기, 테이블 최소 폭,
+모바일 KPI·예측 카드의 가로 스냅 스크롤까지 재조정했습니다.
 
 ## 실행
 
@@ -31,6 +52,10 @@ npm run typecheck  # TypeScript 검사
 - **데이터 탐색**: 지표(매출·주문·고객·전환율·광고비) × 차원(기간·채널·상품·고객유형)
 - **보고서**: Executive Summary ~ AI Recommendation 6단 구성 미리보기
 - **필터**: 기간(7/30/90일 또는 직접 선택)·채널·상품 — KPI·차트·이상징후·예측·인사이트에 모두 반영
+- **KPI ↔ 차트 연동**: KPI 카드를 누르면 추이 차트가 해당 지표(매출·주문·고객·전환율·객단가)로 전환
+- **정렬 가능한 데이터 테이블**: 컬럼 헤더 클릭 정렬 + 고정 헤더
+- **보고서 PDF 저장**: 인쇄 전용 스타일로 사이드바·툴바를 제외하고 A4에 맞춰 출력
+- **접근성**: 키보드 포커스 링, `prefers-reduced-motion` 대응, 44px 터치 타깃
 
 ## 데모 데이터 스토리 (이커머스, 2024.03.03~05.31)
 
@@ -51,10 +76,10 @@ Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · Recharts · Lucide Ic
 |---|---|
 | 배경 / 카드 | `#f4f7fc` / `#ffffff` |
 | 보더 | `#e9eef7` (강조 `#dbe3ef`) |
-| 브랜드 | `#2563eb` (hover `#1d4ed8`, soft `#eff4ff`) |
-| 텍스트 | `#0f172a` / `#64748b` / `#94a3b8` |
+| 브랜드 | `#1478ff` (hover `#0b5fd6`, soft `#ecf3ff`) — 미래에이아이랩 로고 블루 |
+| 텍스트 | `#09242d` / `#5a6b78` / `#8b9aa6` |
 | 상태 | 상승 `#16a34a` · 주의 `#f97316` · 하락 `#ef4444` |
-| 차트 | `#2563eb` · `#2dd4bf` · `#a78bfa` · `#cbd5e1` |
+| 차트 | `#1478ff` · `#16bfd6` · `#8b7bf5` · `#cbd5e1` |
 
 ## AI 구조
 
@@ -75,8 +100,9 @@ app/            페이지 (랜딩, dashboard, analytics, explore, insights, ai,
                 forecast, anomalies, notifications, reports, data, settings, more)
 components/     MetricCard, InsightCard, AnomalyCard, ForecastCard, MobileHome,
                 InsightCarousel, Sidebar, TopBar, MobileNav, DateRangePicker,
-                NotificationBell, DataTable, UploadPanel, charts/ ...
+                NotificationBell, DataTable, UploadPanel, MiraeLogo, AppFooter, charts/ ...
 lib/            analytics-engine, anomaly-engine, forecast-engine,
-                insight-generator, notifications, ai, csv, demo-data, store
+                insight-generator, notifications, ai, csv, demo-data, store, brand
+public/brand/   미래에이아이랩 로고 원본 SVG (horizontal, symbol)
 supabase/       schema.sql
 ```

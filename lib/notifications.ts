@@ -17,7 +17,7 @@ export function buildNotifications(
   const read = new Set(readIds);
   return detectAnomalies(dataset.rows, NOTIFICATION_SCOPE)
     .filter((a) => a.severity !== "info")
-    .slice(0, 8)
+    .slice(0, 12)
     .map((a) => ({
       id: a.id,
       severity: a.severity,

@@ -26,20 +26,20 @@ export default function MobileNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur-md lg:hidden">
-      <div className="mx-auto flex h-[68px] max-w-md items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
+      <div className="mx-auto flex h-[84px] max-w-md items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
         {ITEMS.map(({ href, label, icon: Icon, center, badge }) => {
           const active = pathname === href;
           if (center) {
             return (
-              <Link key={href} href={href} className="-mt-7 flex flex-col items-center" aria-label="AI 질의">
+              <Link key={href} href={href} className="-mt-8 flex flex-col items-center" aria-label="AI 질의">
                 <span
-                  className={`flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-lg shadow-brand/35 transition-transform duration-200 ${
+                  className={`flex h-[68px] w-[68px] items-center justify-center rounded-full bg-brand text-white shadow-lg shadow-brand/35 transition-transform duration-200 ${
                     active ? "scale-105 ring-4 ring-brand-soft" : "active:scale-95"
                   }`}
                 >
-                  <Icon className="h-6 w-6" />
+                  <Icon className="h-9 w-9" />
                 </span>
-                <span className={`mt-1 text-[10px] font-semibold ${active ? "text-brand" : "text-ink-dim"}`}>
+                <span className={`mt-1 text-[15px] font-semibold ${active ? "text-brand" : "text-ink-dim"}`}>
                   {label}
                 </span>
               </Link>
@@ -55,14 +55,14 @@ export default function MobileNav() {
               }`}
             >
               <span className="relative">
-                <Icon className="h-[21px] w-[21px]" strokeWidth={active ? 2.2 : 1.8} />
+                <Icon className="h-[28px] w-[28px]" strokeWidth={active ? 2.2 : 1.8} />
                 {badge && unread > 0 && (
-                  <span className="absolute -right-1.5 -top-1 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-negative px-1 text-[9px] font-bold text-white">
+                  <span className="absolute -right-1.5 -top-1 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-negative px-1 text-[13.5px] font-bold text-white">
                     {unread}
                   </span>
                 )}
               </span>
-              <span className="text-[10px] font-medium">{label}</span>
+              <span className="text-[15px] font-medium">{label}</span>
             </Link>
           );
         })}

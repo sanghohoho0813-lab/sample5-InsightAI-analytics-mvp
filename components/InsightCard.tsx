@@ -23,22 +23,22 @@ export default function InsightCard({ insight, delay = 0 }: { insight: Insight; 
     <button
       onClick={() => setOpen((o) => !o)}
       aria-expanded={open}
-      className="card card-hover animate-fade-up w-full p-4 text-left"
+      className="card card-hover animate-fade-up w-full p-5 text-left"
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className="flex items-start gap-3">
-        <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${meta.tone}`}>
-          <Icon className="h-[18px] w-[18px]" />
+        <span className={`mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] ${meta.tone}`}>
+          <Icon className="h-[27px] w-[27px]" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[11.5px] font-semibold text-ink-dim">{insight.category}</p>
-          <p className="mt-0.5 text-[13.5px] font-semibold leading-snug text-ink">{insight.title}</p>
-          <p className="mt-1 text-[12.5px] leading-relaxed text-ink-soft">{insight.description}</p>
+          <p className="text-[17px] font-semibold text-ink-dim">{insight.category}</p>
+          <p className="mt-0.5 text-[20px] font-semibold leading-snug text-ink">{insight.title}</p>
+          <p className="mt-1 text-[19px] leading-relaxed text-ink-soft">{insight.description}</p>
           <div className={`grid transition-all duration-300 ${open ? "mt-2 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
-            <p className="overflow-hidden rounded-lg text-[12px] leading-relaxed text-ink-dim">{insight.detail}</p>
+            <p className="overflow-hidden rounded-lg text-[18px] leading-relaxed text-ink-dim">{insight.detail}</p>
           </div>
         </div>
-        <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-ink-dim transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`mt-1 h-6 w-6 shrink-0 text-ink-dim transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
       </div>
     </button>
   );

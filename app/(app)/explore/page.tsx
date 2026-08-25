@@ -63,7 +63,7 @@ export default function ExplorePage() {
   const metricLabel = METRICS.find((m) => m.value === metric)!.label;
 
   const chipCls = (on: boolean) =>
-    `rounded-xl px-3.5 py-2 text-[12.5px] font-medium transition-all duration-200 ${
+    `rounded-xl px-3.5 py-2 text-[19px] font-medium transition-all duration-200 ${
       on ? "bg-brand text-white shadow-md shadow-brand/25" : "border border-line bg-surface-soft text-ink-dim hover:text-ink-soft"
     }`;
 
@@ -75,7 +75,7 @@ export default function ExplorePage() {
       <div className="card animate-fade-up p-4 md:p-5">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">Metric</p>
+            <p className="mb-1.5 text-[16.5px] font-semibold uppercase tracking-wide text-ink-dim">Metric</p>
             <div className="flex flex-wrap gap-1.5">
               {METRICS.map((m) => (
                 <button key={m.value} onClick={() => setMetric(m.value)} className={chipCls(metric === m.value)}>
@@ -85,7 +85,7 @@ export default function ExplorePage() {
             </div>
           </div>
           <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">Dimension</p>
+            <p className="mb-1.5 text-[16.5px] font-semibold uppercase tracking-wide text-ink-dim">Dimension</p>
             <div className="flex flex-wrap gap-1.5">
               {DIMENSIONS.map((d) => (
                 <button key={d.value} onClick={() => setDimension(d.value)} className={chipCls(dimension === d.value)}>
@@ -108,7 +108,7 @@ export default function ExplorePage() {
                 </defs>
                 <CartesianGrid stroke="#122544" strokeDasharray="3 6" vertical={false} />
                 <XAxis dataKey="name" tickFormatter={formatDateShort} axisLine={false} tickLine={false} minTickGap={28} dy={6} />
-                <YAxis tickFormatter={axisFmt} axisLine={false} tickLine={false} width={58} domain={["auto", "auto"]} />
+                <YAxis tickFormatter={axisFmt} axisLine={false} tickLine={false} width={88} domain={["auto", "auto"]} />
                 <Tooltip
                   content={({ active, payload, label }) =>
                     active && payload?.length ? (
@@ -131,7 +131,7 @@ export default function ExplorePage() {
               <BarChart data={series} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="#122544" strokeDasharray="3 6" vertical={false} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} dy={6} />
-                <YAxis tickFormatter={axisFmt} axisLine={false} tickLine={false} width={58} />
+                <YAxis tickFormatter={axisFmt} axisLine={false} tickLine={false} width={88} />
                 <Tooltip
                   cursor={{ fill: "#122544", opacity: 0.4 }}
                   content={({ active, payload }) =>
@@ -149,9 +149,9 @@ export default function ExplorePage() {
 
       {dimension !== "date" && (
         <div className="mt-4 card animate-fade-up overflow-x-auto p-4">
-          <table className="w-full min-w-[420px] text-[12.5px]">
+          <table className="w-full min-w-[600px] text-[19px]">
             <thead>
-              <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-wide text-ink-dim">
+              <tr className="border-b border-line text-left text-[17px] uppercase tracking-wide text-ink-dim">
                 <th className="px-3 py-2 font-medium">{DIMENSIONS.find((d) => d.value === dimension)!.label}</th>
                 <th className="px-3 py-2 text-right font-medium">{metricLabel}</th>
                 <th className="px-3 py-2 text-right font-medium">비중</th>

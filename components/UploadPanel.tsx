@@ -69,9 +69,9 @@ export default function UploadPanel() {
   if (phase === "reading") {
     return (
       <div className="card p-8 text-center animate-fade-in">
-        <FileSpreadsheet className="mx-auto h-10 w-10 text-brand" />
-        <p className="mt-3 text-[14px] font-semibold">{fileName}</p>
-        <p className="mt-1 text-[12px] text-ink-dim">파일을 읽고 있습니다…</p>
+        <FileSpreadsheet className="mx-auto h-14 w-14 text-brand" />
+        <p className="mt-3 text-[21px] font-semibold">{fileName}</p>
+        <p className="mt-1 text-[18px] text-ink-dim">파일을 읽고 있습니다…</p>
         <div className="mx-auto mt-4 h-1.5 max-w-xs overflow-hidden rounded-full bg-line">
           <div
             className="h-full rounded-full bg-gradient-to-r from-brand to-brand-dark transition-all duration-300"
@@ -86,20 +86,20 @@ export default function UploadPanel() {
     return (
       <div className="card border-negative/30 p-6 animate-fade-in">
         <div className="flex items-start gap-3">
-          <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-negative" />
+          <XCircle className="mt-0.5 h-7 w-7 shrink-0 text-negative" />
           <div className="flex-1">
-            <p className="text-[14px] font-semibold">업로드에 실패했습니다</p>
-            <p className="mt-1 text-[12.5px] text-ink-soft">{result.error}</p>
-            <div className="mt-3 rounded-xl border border-line bg-surface-soft p-3.5 text-[12px] text-ink-dim">
+            <p className="text-[21px] font-semibold">업로드에 실패했습니다</p>
+            <p className="mt-1 text-[19px] text-ink-soft">{result.error}</p>
+            <div className="mt-3 rounded-xl border border-line bg-surface-soft p-3.5 text-[18px] text-ink-dim">
               <p className="mb-1.5 font-medium text-ink-soft">지원 컬럼 예시</p>
               <p className="leading-relaxed">{SUPPORTED_COLUMNS.join(" · ")}</p>
               <p className="mt-1.5">필수: Date(YYYY-MM-DD), Revenue · 한글 헤더(날짜, 매출, 주문수…)도 인식합니다.</p>
             </div>
             <button
               onClick={reset}
-              className="mt-4 flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2 text-[13px] font-medium transition-colors hover:border-line-strong"
+              className="mt-4 flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2 text-[19.5px] font-medium transition-colors hover:border-line-strong"
             >
-              <RotateCcw className="h-4 w-4" /> 다시 업로드
+              <RotateCcw className="h-6 w-6" /> 다시 업로드
             </button>
           </div>
         </div>
@@ -112,33 +112,33 @@ export default function UploadPanel() {
       <div className="space-y-4 animate-fade-in">
         <div className="card flex flex-wrap items-center gap-x-6 gap-y-2 p-4">
           <div className="flex items-center gap-3">
-            <FileSpreadsheet className="h-8 w-8 text-brand" />
+            <FileSpreadsheet className="h-12 w-12 text-brand" />
             <div>
-              <p className="text-[13.5px] font-semibold">{fileName}</p>
-              <p className="text-[11.5px] text-ink-dim">업로드 완료 · 미리보기를 확인한 뒤 분석을 시작하세요</p>
+              <p className="text-[20px] font-semibold">{fileName}</p>
+              <p className="text-[17px] text-ink-dim">업로드 완료 · 미리보기를 확인한 뒤 분석을 시작하세요</p>
             </div>
           </div>
-          <div className="flex gap-5 text-[12.5px] text-ink-soft">
+          <div className="flex gap-5 text-[19px] text-ink-soft">
             <span><b className="text-ink">{result.rowCount.toLocaleString("ko-KR")}</b> 행</span>
             <span><b className="text-ink">{result.columns.length}</b> 열</span>
           </div>
           <div className="ml-auto flex gap-2">
             <button
               onClick={reset}
-              className="rounded-xl border border-line px-3.5 py-2 text-[13px] font-medium text-ink-soft transition-colors hover:border-line-strong"
+              className="rounded-xl border border-line px-3.5 py-2 text-[19.5px] font-medium text-ink-soft transition-colors hover:border-line-strong"
             >
               취소
             </button>
             <button
               onClick={begin}
-              className="flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-[13px] font-semibold text-white shadow-lg shadow-brand/25 transition-colors hover:bg-brand-dark"
+              className="flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-[19.5px] font-semibold text-white shadow-lg shadow-brand/25 transition-colors hover:bg-brand-dark"
             >
-              <Play className="h-4 w-4" /> 분석 시작
+              <Play className="h-6 w-6" /> 분석 시작
             </button>
           </div>
         </div>
         <div className="card p-4">
-          <h3 className="mb-3 text-[14px] font-semibold">데이터 미리보기</h3>
+          <h3 className="mb-3 text-[21px] font-semibold">데이터 미리보기</h3>
           <DataTable rows={result.rows} />
         </div>
       </div>
@@ -159,14 +159,14 @@ export default function UploadPanel() {
         dragOver ? "border-brand bg-brand-soft" : "border-line"
       }`}
     >
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-soft">
-        <CloudUpload className="h-7 w-7 text-brand" />
+      <span className="flex h-20 w-20 items-center justify-center rounded-2xl bg-brand-soft">
+        <CloudUpload className="h-10 w-10 text-brand" />
       </span>
-      <p className="mt-4 text-[15px] font-semibold">파일을 끌어다 놓거나 선택하세요</p>
-      <p className="mt-1 text-[12.5px] text-ink-dim">CSV, XLSX 지원 · 최대 10MB</p>
+      <p className="mt-4 text-[22.5px] font-semibold">파일을 끌어다 놓거나 선택하세요</p>
+      <p className="mt-1 text-[19px] text-ink-dim">CSV, XLSX 지원 · 최대 10MB</p>
       <button
         onClick={() => inputRef.current?.click()}
-        className="mt-5 rounded-xl bg-brand px-5 py-2.5 text-[13.5px] font-semibold text-white shadow-lg shadow-brand/25 transition-colors hover:bg-brand-dark"
+        className="mt-5 rounded-xl bg-brand px-5 py-2.5 text-[20px] font-semibold text-white shadow-lg shadow-brand/25 transition-colors hover:bg-brand-dark"
       >
         파일 선택
       </button>
@@ -180,7 +180,7 @@ export default function UploadPanel() {
           if (file) handleFile(file);
         }}
       />
-      <p className="mt-4 text-[11.5px] text-ink-dim">
+      <p className="mt-4 text-[17px] text-ink-dim">
         필수 컬럼: Date, Revenue · 선택: Orders, Customers, Channel, Product 등
       </p>
     </div>

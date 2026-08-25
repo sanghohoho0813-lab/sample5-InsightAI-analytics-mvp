@@ -10,6 +10,8 @@ import InsightCarousel from "./InsightCarousel";
 import Sparkline from "./Sparkline";
 import ForecastCard from "./ForecastCard";
 import SectionHeader from "./SectionHeader";
+import { MiraeLockup } from "./MiraeLogo";
+import { BRAND } from "@/lib/brand";
 
 /** 모바일 홈 — '오늘의 비즈니스 요약' (첨부 디자인의 모바일 화면 구성) */
 export default function MobileHome({
@@ -31,8 +33,14 @@ export default function MobileHome({
 
   return (
     <div className="lg:hidden">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <h1 className="text-[19px] font-bold tracking-tight text-ink">오늘의 비즈니스 요약</h1>
+      <div className="mb-4 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <MiraeLockup size="sm" />
+          <h1 className="mt-2 text-[25px] font-bold leading-tight tracking-tight text-ink">
+            오늘의 비즈니스 요약
+          </h1>
+          <p className="mt-1 text-[16px] text-ink-soft">{BRAND.user.display}</p>
+        </div>
         <NotificationBell />
       </div>
 
@@ -41,21 +49,21 @@ export default function MobileHome({
       </div>
 
       {/* 핵심 KPI 3종 */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="snap-row -mx-4 flex gap-3 overflow-x-auto px-4 pb-1" role="list" aria-label="핵심 지표">
         {topKpis.map((kpi, i) => {
           const up = kpi.changePct >= 0;
           const isPoint = kpi.key === "conversion";
           return (
-            <div key={kpi.key} className="card animate-fade-up p-3" style={{ animationDelay: `${i * 60}ms` }}>
-              <p className="text-[11px] font-medium text-ink-soft">{kpi.label}</p>
-              <p className="mt-1 text-[16px] font-bold leading-tight tracking-tight text-ink">
+            <div key={kpi.key} role="listitem" className="snap-item card animate-fade-up w-[46vw] max-w-[220px] shrink-0 p-4" style={{ animationDelay: `${i * 60}ms` }}>
+              <p className="text-[16.5px] font-medium text-ink-soft">{kpi.label}</p>
+              <p className="mt-1 text-[24px] font-bold leading-tight tracking-tight text-ink">
                 {formatValue(kpi.value, kpi.format)}
               </p>
-              <p className={`mt-0.5 text-[10.5px] font-bold ${up ? "text-positive" : "text-negative"}`}>
+              <p className={`mt-0.5 text-[16px] font-bold ${up ? "text-positive" : "text-negative"}`}>
                 {up ? "▲" : "▼"} {Math.abs(kpi.changePct).toFixed(isPoint ? 2 : 1)}{isPoint ? "%p" : "%"}
               </p>
               <div className="mt-1.5">
-                <Sparkline data={kpi.spark} color={up ? "#2563eb" : "#ef4444"} width={70} height={22} dots />
+                <Sparkline data={kpi.spark} color={up ? "#1478ff" : "#ef4444"} width={70} height={22} dots />
               </div>
             </div>
           );
@@ -72,12 +80,12 @@ export default function MobileHome({
         <SectionHeader
           title="이상 징후 알림"
           href="/anomalies"
-          icon={<Bell className="h-4 w-4 text-warning" />}
+          icon={<Bell className="h-6 w-6 text-warning" />}
           count={alerts.length}
         />
         <div className="card divide-y divide-line">
           {alerts.length === 0 ? (
-            <p className="p-5 text-center text-[12.5px] text-ink-dim">
+            <p className="p-5 text-center text-[19px] text-ink-dim">
               이 기간에는 특이한 변화가 감지되지 않았습니다.
             </p>
           ) : (
@@ -86,15 +94,15 @@ export default function MobileHome({
               const tone = a.severity === "critical" ? "text-negative bg-negative-soft" : "text-warning bg-warning-soft";
               return (
                 <Link key={a.id} href="/anomalies" className="flex gap-3 p-3.5 transition-colors active:bg-surface-soft">
-                  <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${tone}`}>
-                    <Icon className="h-3.5 w-3.5" />
+                  <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${tone}`}>
+                    <Icon className="h-5 w-5" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-[12.5px] font-semibold text-ink">{a.title}</span>
-                      <span className="tabular shrink-0 text-[10.5px] text-ink-dim">{formatDateKR(a.date)}</span>
+                      <span className="truncate text-[19px] font-semibold text-ink">{a.title}</span>
+                      <span className="tabular shrink-0 text-[16px] text-ink-dim">{formatDateKR(a.date)}</span>
                     </span>
-                    <span className="mt-0.5 block text-[11.5px] leading-relaxed text-ink-soft">{a.description}</span>
+                    <span className="mt-0.5 block text-[17px] leading-relaxed text-ink-soft">{a.description}</span>
                   </span>
                 </Link>
               );
@@ -102,9 +110,9 @@ export default function MobileHome({
           )}
           <Link
             href="/notifications"
-            className="flex items-center justify-center gap-1 py-3 text-[12.5px] font-semibold text-brand"
+            className="flex items-center justify-center gap-1 py-3 text-[19px] font-semibold text-brand"
           >
-            모든 알림 보기 <ChevronRight className="h-3.5 w-3.5" />
+            모든 알림 보기 <ChevronRight className="h-5 w-5" />
           </Link>
         </div>
       </section>
@@ -112,18 +120,20 @@ export default function MobileHome({
       {/* 예측 요약 */}
       <section className="mt-5">
         <SectionHeader title="예측 요약" href="/forecast" />
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="snap-row -mx-4 flex gap-3 overflow-x-auto px-4 pb-1" role="list" aria-label="예측 요약">
           {forecasts.map((f, i) => (
-            <ForecastCard key={f.key} summary={f} delay={i * 60} compact />
+            <div key={f.key} role="listitem" className="snap-item w-[62vw] max-w-[260px] shrink-0">
+              <ForecastCard summary={f} delay={i * 60} compact />
+            </div>
           ))}
         </div>
       </section>
 
       <Link
         href="/reports"
-        className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-[14px] font-semibold text-white shadow-lg shadow-brand/25 transition-colors active:bg-brand-dark"
+        className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3.5 text-[21px] font-semibold text-white shadow-lg shadow-brand/25 transition-colors active:bg-brand-dark"
       >
-        <Sparkles className="h-4.5 w-4.5" />
+        <Sparkles className="h-6 w-6" />
         AI 보고서 생성
       </Link>
     </div>

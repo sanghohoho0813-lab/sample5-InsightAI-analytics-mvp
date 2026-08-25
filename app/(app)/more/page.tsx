@@ -17,10 +17,10 @@ export default function MorePage() {
             className="card card-hover animate-fade-up flex flex-col items-start gap-3 p-4"
             style={{ animationDelay: `${i * 40}ms` }}
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-soft">
-              <Icon className="h-5 w-5 text-brand" />
+            <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-brand-soft">
+              <Icon className="h-7 w-7 text-brand" />
             </span>
-            <span className="text-[13.5px] font-semibold">{label}</span>
+            <span className="text-[20px] font-semibold">{label}</span>
           </Link>
         ))}
       </div>

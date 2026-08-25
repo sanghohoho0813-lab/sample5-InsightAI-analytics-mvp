@@ -3,7 +3,7 @@
 /** KPI 카드용 미니 스파크라인 (SVG) */
 export default function Sparkline({
   data,
-  color = "#2563eb",
+  color = "#1478ff",
   width = 96,
   height = 30,
   dots = false,

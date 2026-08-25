@@ -9,7 +9,7 @@ export default function FilterBar({ dataset }: { dataset: DemoDataset }) {
   const { filters, setFilters } = useApp();
 
   const selectCls =
-    "h-9 max-w-[42vw] rounded-[10px] border border-line bg-surface px-2.5 text-[12.5px] font-medium text-ink outline-none transition-colors focus:border-brand";
+    "h-12 max-w-[42vw] rounded-[10px] border border-line bg-surface px-2.5 text-[19px] font-medium text-ink outline-none transition-colors focus:border-brand";
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 lg:hidden">

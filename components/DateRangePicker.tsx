@@ -32,6 +32,14 @@ export default function DateRangePicker({ dataset }: { dataset: DemoDataset }) {
     return `${formatDateKR(currentDates[0])} ~ ${formatDateKR(currentDates[currentDates.length - 1])}`;
   }, [dataset, filters]);
 
+  // 모바일에서는 연도를 생략해 한 줄에 들어가게 한다.
+  const shortLabel = useMemo(() => {
+    const { currentDates } = resolveDates(dataset.rows, filters);
+    if (currentDates.length === 0) return "기간 선택";
+    const trim = (d: string) => d.slice(5).replace("-", ".");
+    return `${trim(currentDates[0])} ~ ${trim(currentDates[currentDates.length - 1])}`;
+  }, [dataset, filters]);
+
   useEffect(() => {
     if (!open) return;
     const { currentDates } = resolveDates(dataset.rows, filters);
@@ -68,11 +76,12 @@ export default function DateRangePicker({ dataset }: { dataset: DemoDataset }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="flex h-9 items-center gap-2 rounded-[10px] border border-line bg-surface px-3 text-[12.5px] font-medium text-ink transition-colors hover:border-line-strong"
+        className="flex h-12 items-center gap-2 rounded-[10px] border border-line bg-surface px-3 text-[19px] font-medium text-ink transition-colors hover:border-line-strong"
       >
-        <CalendarDays className="h-[15px] w-[15px] text-ink-dim" />
-        <span className="tabular max-w-[46vw] truncate sm:max-w-none">{label}</span>
-        <ChevronDown className={`h-3.5 w-3.5 text-ink-dim transition-transform ${open ? "rotate-180" : ""}`} />
+        <CalendarDays className="h-[22px] w-[22px] text-ink-dim" />
+        <span className="tabular hidden sm:inline">{label}</span>
+        <span className="tabular sm:hidden">{shortLabel}</span>
+        <ChevronDown className={`h-5 w-5 text-ink-dim transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
@@ -81,7 +90,7 @@ export default function DateRangePicker({ dataset }: { dataset: DemoDataset }) {
           aria-label="기간 선택"
           className="card animate-fade-in absolute right-0 z-50 mt-2 w-[min(300px,88vw)] p-3.5 shadow-lg"
         >
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">빠른 선택</p>
+          <p className="mb-2 text-[16.5px] font-semibold uppercase tracking-wide text-ink-dim">빠른 선택</p>
           <div className="grid grid-cols-3 gap-1.5">
             {PRESETS.map((p) => (
               <button
@@ -90,7 +99,7 @@ export default function DateRangePicker({ dataset }: { dataset: DemoDataset }) {
                   setPreset(p.value);
                   setOpen(false);
                 }}
-                className={`rounded-lg border px-2 py-2 text-[12px] font-medium transition-colors ${
+                className={`rounded-lg border px-2 py-2 text-[18px] font-medium transition-colors ${
                   filters.preset === p.value
                     ? "border-brand bg-brand-soft text-brand"
                     : "border-line text-ink-soft hover:border-line-strong hover:text-ink"
@@ -101,7 +110,7 @@ export default function DateRangePicker({ dataset }: { dataset: DemoDataset }) {
             ))}
           </div>
 
-          <p className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">직접 선택</p>
+          <p className="mb-2 mt-4 text-[16.5px] font-semibold uppercase tracking-wide text-ink-dim">직접 선택</p>
           <div className="flex items-center gap-2">
             <input
               type="date"
@@ -110,7 +119,7 @@ export default function DateRangePicker({ dataset }: { dataset: DemoDataset }) {
               max={bounds.max}
               onChange={(e) => setDraft((d) => ({ ...d, start: e.target.value }))}
               aria-label="시작일"
-              className="h-9 w-full rounded-lg border border-line bg-surface px-2 text-[12px] text-ink outline-none focus:border-brand"
+              className="h-12 w-full rounded-lg border border-line bg-surface px-2 text-[18px] text-ink outline-none focus:border-brand"
             />
             <span className="text-ink-dim">~</span>
             <input
@@ -120,15 +129,15 @@ export default function DateRangePicker({ dataset }: { dataset: DemoDataset }) {
               max={bounds.max}
               onChange={(e) => setDraft((d) => ({ ...d, end: e.target.value }))}
               aria-label="종료일"
-              className="h-9 w-full rounded-lg border border-line bg-surface px-2 text-[12px] text-ink outline-none focus:border-brand"
+              className="h-12 w-full rounded-lg border border-line bg-surface px-2 text-[18px] text-ink outline-none focus:border-brand"
             />
           </div>
-          <p className="mt-2 text-[11px] text-ink-dim">
+          <p className="mt-2 text-[16.5px] text-ink-dim">
             데이터 보유 기간 {formatDateKR(bounds.min)} ~ {formatDateKR(bounds.max)}
           </p>
           <button
             onClick={apply}
-            className="mt-3 w-full rounded-[10px] bg-brand py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-brand-dark"
+            className="mt-3 w-full rounded-[10px] bg-brand py-2.5 text-[19.5px] font-semibold text-white transition-colors hover:bg-brand-dark"
           >
             적용
           </button>

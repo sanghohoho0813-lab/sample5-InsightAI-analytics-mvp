@@ -43,9 +43,9 @@ export default function NotificationsPage() {
                 markRead(items.map((n) => n.id));
                 showToast("모든 알림을 읽음으로 표시했습니다.", "success");
               }}
-              className="flex items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3.5 py-2 text-[12.5px] font-medium text-ink-soft transition-colors hover:border-line-strong hover:text-ink"
+              className="flex items-center gap-1.5 rounded-[10px] border border-line bg-surface px-3.5 py-2 text-[19px] font-medium text-ink-soft transition-colors hover:border-line-strong hover:text-ink"
             >
-              <CheckCheck className="h-4 w-4" /> 모두 읽음
+              <CheckCheck className="h-6 w-6" /> 모두 읽음
             </button>
           ) : undefined
         }
@@ -53,11 +53,11 @@ export default function NotificationsPage() {
 
       {items.length === 0 ? (
         <div className="card animate-fade-up flex flex-col items-center px-6 py-14 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-soft">
-            <BellOff className="h-7 w-7 text-ink-dim" />
+          <span className="flex h-20 w-20 items-center justify-center rounded-2xl bg-surface-soft">
+            <BellOff className="h-10 w-10 text-ink-dim" />
           </span>
-          <p className="mt-4 text-[14px] font-semibold text-ink">새로운 알림이 없습니다</p>
-          <p className="mt-1 text-[12.5px] text-ink-soft">최근 30일 동안 주의가 필요한 변화가 감지되지 않았습니다.</p>
+          <p className="mt-4 text-[21px] font-semibold text-ink">새로운 알림이 없습니다</p>
+          <p className="mt-1 text-[19px] text-ink-soft">최근 30일 동안 주의가 필요한 변화가 감지되지 않았습니다.</p>
         </div>
       ) : (
         <ul className="space-y-2.5">
@@ -71,16 +71,16 @@ export default function NotificationsPage() {
                   className={`card card-hover animate-fade-up flex gap-3 p-4 ${n.read ? "" : "border-brand/25 bg-brand-soft/40"}`}
                   style={{ animationDelay: `${i * 50}ms` }}
                 >
-                  <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${tone}`}>
-                    <Icon className="h-4 w-4" />
+                  <span className={`mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] ${tone}`}>
+                    <Icon className="h-6 w-6" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
                       {!n.read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />}
-                      <span className="truncate text-[13.5px] font-semibold text-ink">{n.title}</span>
-                      <span className="tabular ml-auto shrink-0 text-[11px] text-ink-dim">{formatDateKR(n.date)}</span>
+                      <span className="truncate text-[20px] font-semibold text-ink">{n.title}</span>
+                      <span className="tabular ml-auto shrink-0 text-[16.5px] text-ink-dim">{formatDateKR(n.date)}</span>
                     </span>
-                    <span className="mt-1 block text-[12.5px] leading-relaxed text-ink-soft">{n.description}</span>
+                    <span className="mt-1 block text-[19px] leading-relaxed text-ink-soft">{n.description}</span>
                   </span>
                 </Link>
               </li>
@@ -89,7 +89,7 @@ export default function NotificationsPage() {
         </ul>
       )}
 
-      <p className="mt-5 text-[11.5px] leading-relaxed text-ink-dim">
+      <p className="mt-5 text-[17px] leading-relaxed text-ink-dim">
         알림은 Critical·Warning 등급의 이상징후만 최근 30일 기준으로 전달됩니다. 감지 규칙은 이상 감지 화면에서 확인할 수 있습니다.
       </p>
     </>
