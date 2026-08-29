@@ -6,6 +6,7 @@ import { Anomaly, DemoDataset, ForecastSummary, Insight, KpiResult } from "@/lib
 import { formatDateKR, formatValue } from "@/lib/format";
 import DateRangePicker from "./DateRangePicker";
 import NotificationBell from "./NotificationBell";
+import LiveClock from "./LiveClock";
 import InsightCarousel from "./InsightCarousel";
 import Sparkline from "./Sparkline";
 import ForecastCard from "./ForecastCard";
@@ -40,6 +41,7 @@ export default function MobileHome({
             오늘의 비즈니스 요약
           </h1>
           <p className="mt-1 text-[16px] text-ink-soft">{BRAND.user.display}</p>
+          <LiveClock variant="stack" className="mt-2.5" />
         </div>
         <NotificationBell />
       </div>

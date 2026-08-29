@@ -125,21 +125,32 @@ function generate(spec: GenSpec): DataRow[] {
 }
 
 const DAYS = 90;
-const END = "2024-05-31";
+
+function isoDay(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** 데모 데이터는 항상 '오늘'까지의 최근 90일을 사용한다. */
+function todayISO(): string {
+  return isoDay(new Date());
+}
+
+/** 스토리 이벤트를 마지막 날 기준 상대 인덱스로 지정한다(n일 전). */
+const ago = (n: number) => DAYS - 1 - n;
 
 /**
- * 이커머스 데모 스토리
- * - 5월 초: 평균적인 매출
- * - 5월 10~16일: 프로모션으로 모바일 중심 매출 급증
- * - 5월 20일: 웹사이트 트래픽 급감(수집 장애), 5월 20~24일 모바일 결제 이탈 증가
- * - 5월 25일~: 검색광고 유입(웹사이트) 전환율 개선, 객단가 상승
+ * 이커머스 데모 스토리 (마지막 날 = 오늘)
+ * - 21~15일 전: 프로모션으로 모바일 중심 매출 급증
+ * - 11일 전: 웹사이트 트래픽 급감(수집 장애)
+ * - 11~7일 전: 모바일 결제 이탈 증가
+ * - 6일 전~오늘: 검색광고 유입(웹사이트) 전환율 개선, 객단가 상승
  * - 최근 2주: "비타민 세럼" 판매 가속
  */
-function ecommerceRows(): DataRow[] {
-  const d = (mmdd: string) => dateRange(END, DAYS).indexOf(`2024-${mmdd}`);
+function ecommerceRows(endDate: string): DataRow[] {
   return generate({
     seed: 20240531,
-    endDate: END,
+    endDate,
     days: DAYS,
     dailyRevenue: 38_000_000,
     growth: 0.24,
@@ -156,24 +167,24 @@ function ecommerceRows(): DataRow[] {
       { name: "선케어 스틱", share: 0.18 },
     ],
     events: [
-      // 5월 프로모션 (10~16일): 전 채널 상승, 모바일 특히 강세
-      { from: d("05-10"), to: d("05-16"), revenueMul: 1.32 },
-      { from: d("05-10"), to: d("05-16"), channel: "모바일 앱", revenueMul: 1.18, convMul: 1.15 },
-      // 5월 20일: 웹사이트 트래픽 급감
-      { from: d("05-20"), to: d("05-20"), channel: "웹사이트", revenueMul: 0.62, visitorMul: 0.55 },
-      // 5월 20~24일: 모바일 결제 이탈 증가 (전환율 하락)
-      { from: d("05-20"), to: d("05-24"), channel: "모바일 앱", convMul: 0.72, revenueMul: 0.88 },
-      // 5월 25일~: 검색광고 전환 개선 + 객단가 상승
-      { from: d("05-25"), to: DAYS - 1, channel: "웹사이트", convMul: 1.22, revenueMul: 1.14, aovMul: 1.1 },
-      { from: d("05-25"), to: DAYS - 1, aovMul: 1.08 },
+      // 프로모션(21~15일 전): 전 채널 상승, 모바일 특히 강세
+      { from: ago(21), to: ago(15), revenueMul: 1.32 },
+      { from: ago(21), to: ago(15), channel: "모바일 앱", revenueMul: 1.18, convMul: 1.15 },
+      // 11일 전: 웹사이트 트래픽 급감
+      { from: ago(11), to: ago(11), channel: "웹사이트", revenueMul: 0.62, visitorMul: 0.55 },
+      // 11~7일 전: 모바일 결제 이탈 증가 (전환율 하락)
+      { from: ago(11), to: ago(7), channel: "모바일 앱", convMul: 0.72, revenueMul: 0.88 },
+      // 6일 전~오늘: 검색광고 전환 개선 + 객단가 상승
+      { from: ago(6), to: ago(0), channel: "웹사이트", convMul: 1.22, revenueMul: 1.14, aovMul: 1.1 },
+      { from: ago(6), to: ago(0), aovMul: 1.08 },
     ],
   });
 }
 
-function marketingRows(): DataRow[] {
+function marketingRows(endDate: string): DataRow[] {
   return generate({
     seed: 7714,
-    endDate: END,
+    endDate,
     days: DAYS,
     dailyRevenue: 21_000_000,
     growth: 0.18,
@@ -190,17 +201,17 @@ function marketingRows(): DataRow[] {
       { name: "브랜드 캠페인", share: 0.13 },
     ],
     events: [
-      { from: 55, to: 62, channel: "SNS 광고", revenueMul: 1.28 },
-      { from: 74, to: 74, channel: "디스플레이", revenueMul: 0.55, visitorMul: 0.6 },
-      { from: 78, to: DAYS - 1, channel: "검색 광고", convMul: 1.25, revenueMul: 1.12 },
+      { from: ago(34), to: ago(27), channel: "SNS 광고", revenueMul: 1.28 },
+      { from: ago(15), to: ago(15), channel: "디스플레이", revenueMul: 0.55, visitorMul: 0.6 },
+      { from: ago(11), to: ago(0), channel: "검색 광고", convMul: 1.25, revenueMul: 1.12 },
     ],
   });
 }
 
-function retailRows(): DataRow[] {
+function retailRows(endDate: string): DataRow[] {
   return generate({
     seed: 3391,
-    endDate: END,
+    endDate,
     days: DAYS,
     dailyRevenue: 29_000_000,
     growth: 0.12,
@@ -217,47 +228,53 @@ function retailRows(): DataRow[] {
       { name: "원두/굿즈", share: 0.2 },
     ],
     events: [
-      { from: 60, to: 66, revenueMul: 1.22 },
-      { from: 70, to: 73, channel: "홍대점", revenueMul: 0.68, visitorMul: 0.7 },
-      { from: 80, to: DAYS - 1, channel: "강남점", aovMul: 1.15, revenueMul: 1.1 },
+      { from: ago(29), to: ago(23), revenueMul: 1.22 },
+      { from: ago(19), to: ago(16), channel: "홍대점", revenueMul: 0.68, visitorMul: 0.7 },
+      { from: ago(9), to: ago(0), channel: "강남점", aovMul: 1.15, revenueMul: 1.1 },
     ],
   });
 }
 
 let cache: DemoDataset[] | null = null;
+let cacheDay = "";
 
 export function getDemoDatasets(): DemoDataset[] {
-  if (cache) return cache;
+  const end = todayISO();
+  // 날짜가 바뀌면(자정 경과) 최근 구간으로 다시 생성한다.
+  if (cache && cacheDay === end) return cache;
+  cacheDay = end;
+  const dates = dateRange(end, DAYS);
+  const periodLabel = `${dates[0].replaceAll("-", ".")} ~ ${dates[dates.length - 1].replaceAll("-", ".")}`;
   cache = [
     {
       id: "demo-ecommerce",
       name: "이커머스 판매 데이터",
-      description: "뷰티 커머스 90일 판매 데이터. 프로모션·트래픽 급감·광고 전환 개선 스토리가 담겨 있습니다.",
+      description: "뷰티 커머스 최근 90일 판매 데이터. 프로모션·트래픽 급감·광고 전환 개선 스토리가 담겨 있습니다.",
       category: "이커머스",
-      rows: ecommerceRows(),
+      rows: ecommerceRows(end),
       channels: ["웹사이트", "모바일 앱", "스마트스토어", "기타"],
       products: ["시그니처 크림", "비타민 세럼", "수분 토너", "선케어 스틱"],
-      periodLabel: "2024.03.03 ~ 2024.05.31",
+      periodLabel,
     },
     {
       id: "demo-marketing",
       name: "마케팅 성과 데이터",
-      description: "채널별 광고 성과 90일 데이터. 검색·SNS·디스플레이·이메일 채널 효율을 비교할 수 있습니다.",
+      description: "채널별 광고 성과 최근 90일 데이터. 검색·SNS·디스플레이·이메일 채널 효율을 비교할 수 있습니다.",
       category: "마케팅",
-      rows: marketingRows(),
+      rows: marketingRows(end),
       channels: ["검색 광고", "SNS 광고", "디스플레이", "이메일"],
       products: ["신규 가입 캠페인", "재구매 캠페인", "시즌 프로모션", "브랜드 캠페인"],
-      periodLabel: "2024.03.03 ~ 2024.05.31",
+      periodLabel,
     },
     {
       id: "demo-retail",
       name: "매장 매출 데이터",
-      description: "4개 매장의 90일 매출 데이터. 지점별 방문·객단가·주말 패턴을 분석할 수 있습니다.",
+      description: "4개 매장의 최근 90일 매출 데이터. 지점별 방문·객단가·주말 패턴을 분석할 수 있습니다.",
       category: "오프라인 리테일",
-      rows: retailRows(),
+      rows: retailRows(end),
       channels: ["강남점", "홍대점", "판교점", "부산점"],
       products: ["시그니처 라떼", "시즌 한정 메뉴", "디저트 세트", "원두/굿즈"],
-      periodLabel: "2024.03.03 ~ 2024.05.31",
+      periodLabel,
     },
   ];
   return cache;

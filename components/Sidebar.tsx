@@ -142,7 +142,7 @@ export default function Sidebar() {
           <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/10">
             <div className="h-full w-[78%] rounded-full bg-gradient-to-r from-brand to-aqua" />
           </div>
-          <p className="mt-1.5 text-[13px] text-nav-dim">다음 결제일 2024.06.15</p>
+          <p className="mt-1.5 text-[13px] text-nav-dim">결제일 매월 15일</p>
         </div>
 
         <div className="flex items-center gap-3 border-t border-nav-line px-1 pt-3">

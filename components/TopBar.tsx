@@ -6,6 +6,7 @@ import { Settings, Sparkles } from "lucide-react";
 import { useApp } from "@/lib/store";
 import DateRangePicker from "./DateRangePicker";
 import NotificationBell from "./NotificationBell";
+import LiveClock, { LiveTime } from "./LiveClock";
 import Logo from "./Logo";
 import { MiraeWordmark } from "./MiraeLogo";
 import { BRAND } from "@/lib/brand";
@@ -44,6 +45,8 @@ export default function TopBar() {
       {/* 데스크톱 1행 — 타이틀 + 액션 */}
       <div className="hidden h-[74px] items-center gap-3 px-6 lg:flex">
         <h1 className="whitespace-nowrap text-[27px] font-bold tracking-tight text-ink">{title}</h1>
+        <span className="mx-1 hidden h-7 w-px bg-line xl:block" />
+        <LiveClock className="hidden xl:flex" />
         <div className="ml-auto flex items-center gap-2.5">
           <Link
             href="/reports"
@@ -112,6 +115,9 @@ export default function TopBar() {
             <Logo size={30} showText={false} />
           </Link>
           <h1 className="truncate text-[21px] font-bold tracking-tight text-ink">{title}</h1>
+          <span className="tabular ml-1 shrink-0 text-[17px] font-bold text-ink-soft" suppressHydrationWarning>
+            <LiveTime />
+          </span>
           <div className="ml-auto">
             <NotificationBell />
           </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { CheckCircle2, Clock, Database, Play, Table2, Upload } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import SectionHeader from "@/components/SectionHeader";
@@ -12,6 +13,9 @@ import { formatDateKR } from "@/lib/format";
 export default function DataPage() {
   const { dataset, history, startAnalysis, openAnalysis } = useApp();
   const demos = getDemoDatasets();
+  // 데모 기간은 접속 시점 기준으로 계산되므로 하이드레이션 이후에 표시한다.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
     <>
@@ -39,7 +43,9 @@ export default function DataPage() {
                 </div>
                 <p className="mt-2.5 text-[21px] font-semibold">{ds.name}</p>
                 <p className="mt-1 flex-1 text-[18px] leading-relaxed text-ink-soft">{ds.description}</p>
-                <p className="mt-2 text-[16.5px] text-ink-dim">{ds.periodLabel} · {ds.rows.length.toLocaleString("ko-KR")}행</p>
+                <p className="mt-2 text-[16.5px] text-ink-dim" suppressHydrationWarning>
+                  {mounted ? `${ds.periodLabel} · ` : ""}{ds.rows.length.toLocaleString("ko-KR")}행
+                </p>
                 <button
                   onClick={() => startAnalysis(ds)}
                   className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-brand-soft px-3.5 py-2 text-[19px] font-semibold text-brand transition-colors hover:bg-brand hover:text-white"
