@@ -26,7 +26,7 @@ const TITLES: Record<string, string> = {
 };
 
 const SELECT_CLS =
-  "h-12 max-w-[200px] rounded-xl border border-line bg-surface px-3 text-[18px] font-medium text-ink outline-none transition-colors hover:border-line-strong focus:border-brand";
+  "h-12 min-w-0 max-w-[190px] flex-shrink rounded-xl border border-line bg-surface px-3 text-[18px] font-medium text-ink outline-none transition-colors hover:border-line-strong focus:border-brand";
 
 const FILTER_ROUTES = ["/dashboard", "/analytics", "/explore", "/insights", "/anomalies", "/reports"];
 
@@ -98,7 +98,7 @@ export default function TopBar() {
               <option key={pr} value={pr}>{pr}</option>
             ))}
           </select>
-          <span className="ml-auto flex items-center gap-3 whitespace-nowrap">
+          <span className="ml-auto hidden items-center gap-3 whitespace-nowrap xl:flex">
             <span className="text-[14px] font-bold uppercase tracking-[0.14em] text-ink-dim">built by</span>
             <MiraeWordmark height={36} />
           </span>

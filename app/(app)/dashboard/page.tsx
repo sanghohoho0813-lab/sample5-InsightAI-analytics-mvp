@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, LineChart, Sparkles } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -20,8 +20,13 @@ import { computeForecasts } from "@/lib/forecast-engine";
 import { generateInsights } from "@/lib/insight-generator";
 
 export default function DashboardPage() {
-  const { dataset, filters } = useApp();
+  const { dataset, filters, seedDemoDataset } = useApp();
   const [metric, setMetric] = useState<TrendMetric>("revenue");
+
+  // 루트 도메인이 대시보드로 연결되므로, 첫 방문에도 화면이 비어 있지 않게 한다.
+  useEffect(() => {
+    if (!dataset) seedDemoDataset();
+  }, [dataset, seedDemoDataset]);
 
   const data = useMemo(() => {
     if (!dataset) return null;

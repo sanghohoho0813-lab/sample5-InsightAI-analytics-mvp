@@ -133,7 +133,7 @@ export default function ExplorePage() {
                 <XAxis dataKey="name" axisLine={false} tickLine={false} dy={6} />
                 <YAxis tickFormatter={axisFmt} axisLine={false} tickLine={false} width={88} />
                 <Tooltip
-                  cursor={{ fill: "#122544", opacity: 0.4 }}
+                  cursor={{ fill: "#efeade", opacity: 0.6 }}
                   content={({ active, payload }) =>
                     active && payload?.length ? (
                       <ChartTooltip rows={[{ name: String(payload[0].payload.name), value: fmt(Number(payload[0].value)), color: "#22d3ee" }]} />

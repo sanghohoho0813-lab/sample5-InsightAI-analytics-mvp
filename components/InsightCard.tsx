@@ -6,11 +6,11 @@ import { Insight } from "@/lib/types";
 
 const CATEGORY: Record<string, { icon: typeof Sparkles; tone: string }> = {
   "매출 상승 요인": { icon: LineChart, tone: "bg-brand-soft text-brand" },
-  "채널 변화": { icon: LineChart, tone: "bg-warning-soft text-warning" },
-  "고객 행동 변화": { icon: Users, tone: "bg-positive-soft text-positive" },
-  "마케팅 성과": { icon: Megaphone, tone: "bg-brand-soft text-brand" },
-  "제품 인사이트": { icon: Package, tone: "bg-[#f5f1ff] text-iris" },
-  "전환 추세": { icon: Sparkles, tone: "bg-[#eefcfa] text-aqua" },
+  "채널 변화": { icon: LineChart, tone: "bg-amber-soft text-amber" },
+  "고객 행동 변화": { icon: Users, tone: "bg-mint-soft text-mint" },
+  "마케팅 성과": { icon: Megaphone, tone: "bg-rose-soft text-rose" },
+  "제품 인사이트": { icon: Package, tone: "bg-violet-soft text-violet" },
+  "전환 추세": { icon: Sparkles, tone: "bg-aqua-soft text-aqua" },
 };
 
 /** AI 인사이트 카드 — 확장 시 상세 설명 */

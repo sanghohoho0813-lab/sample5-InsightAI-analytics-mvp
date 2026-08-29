@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { MiraeWordmark } from "./MiraeLogo";
 import { BRAND } from "@/lib/brand";
 

@@ -28,6 +28,7 @@ interface AppState {
   showToast: (message: string, type?: ToastMsg["type"]) => void;
   dismissToast: (id: number) => void;
   markRead: (ids: string[]) => void;
+  seedDemoDataset: () => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -151,6 +152,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  /** 첫 방문에서 대시보드가 비어 보이지 않도록 기본 데모 데이터를 조용히 연결한다. */
+  const seedDemoDataset = useCallback(() => {
+    setDataset((prev) => {
+      if (prev) return prev;
+      const demo = getDemoDatasets()[0];
+      persistActiveDataset(demo);
+      return demo;
+    });
+    setAnalyzed(true);
+  }, []);
+
   const startAnalysis = useCallback(
     (ds: DemoDataset, navigateTo = "/dashboard") => {
       setAnalyzing(true);
@@ -221,9 +233,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       showToast,
       dismissToast,
       markRead,
+      seedDemoDataset,
     }),
     [dataset, analyzed, analyzing, analysisStep, filters, history, toasts, readIds,
-     setFilters, setPreset, setCustomRange, startAnalysis, openAnalysis, showToast, dismissToast, markRead]
+     setFilters, setPreset, setCustomRange, startAnalysis, openAnalysis, showToast, dismissToast, markRead, seedDemoDataset]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

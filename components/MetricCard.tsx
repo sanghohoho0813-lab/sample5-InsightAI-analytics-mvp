@@ -5,13 +5,14 @@ import CountUp from "./CountUp";
 import Sparkline from "./Sparkline";
 import { KpiResult } from "@/lib/types";
 import { formatValue } from "@/lib/format";
+import { HUES, HueName } from "@/lib/palette";
 
-const ICONS: Record<string, typeof LineChart> = {
-  revenue: LineChart,
-  orders: BarChart3,
-  customers: Users,
-  conversion: TrendingUp,
-  aov: ShoppingCart,
+const META: Record<string, { icon: typeof LineChart; hue: HueName }> = {
+  revenue: { icon: LineChart, hue: "blue" },
+  orders: { icon: BarChart3, hue: "violet" },
+  customers: { icon: Users, hue: "cyan" },
+  conversion: { icon: TrendingUp, hue: "mint" },
+  aov: { icon: ShoppingCart, hue: "amber" },
 };
 
 export default function MetricCard({
@@ -30,7 +31,9 @@ export default function MetricCard({
   const up = kpi.changePct >= 0;
   const positive = kpi.invert ? !up : up;
   const isPointChange = kpi.key === "conversion"; // 전환율은 %p 변화로 표기
-  const Icon = ICONS[kpi.key] ?? LineChart;
+  const meta = META[kpi.key] ?? { icon: LineChart, hue: "blue" as HueName };
+  const Icon = meta.icon;
+  const c = HUES[meta.hue];
 
   const Tag = onSelect ? "button" : "div";
 
@@ -38,14 +41,17 @@ export default function MetricCard({
     <Tag
       onClick={onSelect}
       aria-pressed={onSelect ? selected : undefined}
-      className={`card card-hover animate-fade-up w-full p-5 text-left md:p-6 ${
-        selected ? "border-brand ring-2 ring-brand/20" : ""
-      }`}
-      style={{ animationDelay: `${delay}ms` }}
+      className={`card card-hover animate-fade-up w-full p-5 text-left md:p-6 ${selected ? "ring-2" : ""}`}
+      style={selected ? { animationDelay: `${delay}ms`, borderColor: c.base, boxShadow: `0 0 0 3px ${c.soft}` } : { animationDelay: `${delay}ms` }}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[19px] font-medium text-ink-soft">{kpi.label}</p>
-        <Icon className="h-[22px] w-[22px] shrink-0 text-brand-light" strokeWidth={2} />
+        <p className="mt-1 text-[19px] font-medium text-ink-soft">{kpi.label}</p>
+        <span
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px]"
+          style={{ backgroundColor: c.soft, color: c.base }}
+        >
+          <Icon className="h-[22px] w-[22px]" strokeWidth={2} />
+        </span>
       </div>
       <p className="mt-1.5 text-[33px] font-bold leading-tight tracking-tight text-ink">
         <CountUp value={kpi.value} format={(v) => formatValue(v, kpi.format)} />
@@ -59,7 +65,7 @@ export default function MetricCard({
       </div>
       {showSpark && (
         <div className="mt-2.5">
-          <Sparkline data={kpi.spark} color={positive ? "#1478ff" : "#ef4444"} width={120} height={30} />
+          <Sparkline data={kpi.spark} color={positive ? c.base : "#dd6350"} width={120} height={30} />
         </div>
       )}
       {onSelect && (

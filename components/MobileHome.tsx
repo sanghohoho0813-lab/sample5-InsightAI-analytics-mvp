@@ -63,7 +63,7 @@ export default function MobileHome({
                 {up ? "▲" : "▼"} {Math.abs(kpi.changePct).toFixed(isPoint ? 2 : 1)}{isPoint ? "%p" : "%"}
               </p>
               <div className="mt-1.5">
-                <Sparkline data={kpi.spark} color={up ? "#1478ff" : "#ef4444"} width={70} height={22} dots />
+                <Sparkline data={kpi.spark} color={up ? "#1478ff" : "#dd6350"} width={70} height={22} dots />
               </div>
             </div>
           );

@@ -1,31 +1,52 @@
 @import "tailwindcss";
 
 @theme {
-  /* Light Analytics 팔레트 — 첨부 디자인 기준 */
-  --color-canvas: #f4f7fc;
+  /* 표면 — 차가운 회색 대신 따뜻한 아이보리 계열 */
+  --color-canvas: #f7f4ec;
   --color-surface: #ffffff;
-  --color-surface-soft: #f8fafc;
-  --color-line: #e9eef7;
-  --color-line-strong: #dbe3ef;
+  --color-surface-soft: #faf8f2;
+  --color-line: #e9e3d7;
+  --color-line-strong: #d9d1c1;
 
-  /* Electric Blue accent */
+  /* 사이드바 — 그래파이트 다크 */
+  --color-nav: #23262c;
+  --color-nav-soft: #2d3138;
+  --color-nav-line: #383d46;
+  --color-nav-text: #c7ccd4;
+  --color-nav-dim: #868d99;
+
+  /* 브랜드(미래에이아이랩 로고 블루) */
   --color-brand: #1478ff;
   --color-brand-dark: #0b5fd6;
-  --color-brand-light: #5aa6ff;
-  --color-brand-soft: #ecf3ff;
-  --color-aqua: #16bfd6;
-  --color-iris: #a78bfa;
+  --color-brand-light: #6aa9ff;
+  --color-brand-soft: #e8f1ff;
 
-  --color-ink: #09242d;
-  --color-ink-soft: #5a6b78;
-  --color-ink-dim: #8b9aa6;
+  /* 액센트 6종 — 상태색과 같은 톤으로 맞춰 함께 써도 튀지 않는다 */
+  --color-aqua: #12a9bf;
+  --color-aqua-soft: #e0f6fa;
+  --color-mint: #2fa36b;
+  --color-mint-soft: #e5f6ed;
+  --color-amber: #d1892c;
+  --color-amber-soft: #fdf1df;
+  --color-coral: #dd6350;
+  --color-coral-soft: #fdebe7;
+  --color-violet: #7360e8;
+  --color-violet-soft: #efecfe;
+  --color-rose: #c9558c;
+  --color-rose-soft: #fceaf2;
 
-  --color-positive: #16a34a;
-  --color-positive-soft: #ecfdf3;
-  --color-warning: #f97316;
-  --color-warning-soft: #fff5ed;
-  --color-negative: #ef4444;
-  --color-negative-soft: #fef2f2;
+  /* 텍스트 — 따뜻한 차콜 */
+  --color-ink: #23272e;
+  --color-ink-soft: #5f6570;
+  --color-ink-dim: #8f96a1;
+
+  /* 상태 — 액센트와 동일 색상을 재사용 */
+  --color-positive: #2fa36b;
+  --color-positive-soft: #e5f6ed;
+  --color-warning: #d1892c;
+  --color-warning-soft: #fdf1df;
+  --color-negative: #dd6350;
+  --color-negative-soft: #fdebe7;
 
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
     "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
@@ -63,10 +84,10 @@ body {
 /* 얇은 커스텀 스크롤바 */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #cfdcea transparent;
+  scrollbar-color: #d5cdbd transparent;
 }
 *::-webkit-scrollbar { width: 6px; height: 6px; }
-*::-webkit-scrollbar-thumb { background: #d8e1ef; border-radius: 3px; }
+*::-webkit-scrollbar-thumb { background: #d5cdbd; border-radius: 3px; }
 *::-webkit-scrollbar-track { background: transparent; }
 
 /* 카드 — 흰 배경 + 매우 얇은 테두리 + 거의 없는 그림자 */
@@ -74,23 +95,23 @@ body {
   background: var(--color-surface);
   border: 1px solid var(--color-line);
   border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 2px rgba(60, 50, 35, 0.05);
 }
 .card-hover {
   transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
 }
 .card-hover:hover {
   border-color: var(--color-line-strong);
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.07);
+  box-shadow: 0 8px 24px rgba(60, 50, 35, 0.08);
 }
 
 /* Recharts 기본 스타일 정리 */
-.recharts-cartesian-axis-tick text { fill: #94a3b8; font-size: 16px; font-weight: 500; }
-.recharts-tooltip-cursor { stroke: #dbe3ef; }
+.recharts-cartesian-axis-tick text { fill: #8f96a1; font-size: 16px; font-weight: 500; }
+.recharts-tooltip-cursor { stroke: #d9d1c1; }
 .recharts-surface:focus, .recharts-wrapper:focus { outline: none; }
 
 .skeleton {
-  background: linear-gradient(90deg, #eef2f8 25%, #f8fafc 50%, #eef2f8 75%);
+  background: linear-gradient(90deg, #efeade 25%, #faf8f2 50%, #efeade 75%);
   background-size: 400px 100%;
   animation: var(--animate-shimmer);
   border-radius: 8px;

@@ -4,9 +4,9 @@ import { ArrowRight, Target } from "lucide-react";
 import { Recommendation } from "@/lib/types";
 
 const PRIORITY = {
-  high: { label: "우선 실행", cls: "bg-negative-soft text-negative" },
-  medium: { label: "권장", cls: "bg-warning-soft text-warning" },
-  low: { label: "검토", cls: "bg-brand-soft text-brand" },
+  high: { label: "우선 실행", cls: "bg-coral-soft text-coral", chip: "bg-coral-soft text-coral" },
+  medium: { label: "권장", cls: "bg-amber-soft text-amber", chip: "bg-amber-soft text-amber" },
+  low: { label: "검토", cls: "bg-aqua-soft text-aqua", chip: "bg-aqua-soft text-aqua" },
 } as const;
 
 /** AI 실행 제안 카드 */
@@ -15,8 +15,8 @@ export default function RecommendationCard({ rec, delay = 0 }: { rec: Recommenda
   return (
     <div className="card card-hover animate-fade-up flex h-full flex-col p-4" style={{ animationDelay: `${delay}ms` }}>
       <div className="flex items-center justify-between gap-2">
-        <span className="flex h-12 w-12 items-center justify-center rounded-[10px] bg-brand-soft">
-          <Target className="h-[27px] w-[27px] text-brand" />
+        <span className={`flex h-12 w-12 items-center justify-center rounded-[10px] ${p.chip}`}>
+          <Target className="h-[27px] w-[27px]" />
         </span>
         <span className={`rounded-md px-2 py-0.5 text-[16px] font-semibold ${p.cls}`}>{p.label}</span>
       </div>

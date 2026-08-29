@@ -78,7 +78,7 @@ export default function AnalyticsPage() {
                 <XAxis dataKey="name" axisLine={false} tickLine={false} dy={6} />
                 <YAxis tickFormatter={(v: number) => formatKRW(v).replace("₩", "")} axisLine={false} tickLine={false} width={86} />
                 <Tooltip
-                  cursor={{ fill: "#122544", opacity: 0.4 }}
+                  cursor={{ fill: "#efeade", opacity: 0.6 }}
                   content={({ active, payload }) =>
                     active && payload?.length ? (
                       <ChartTooltip rows={[{ name: String(payload[0].payload.name), value: formatKRW(payload[0].payload.value), color: "#3b82f6" }]} />
@@ -100,7 +100,7 @@ export default function AnalyticsPage() {
                 <XAxis type="number" tickFormatter={(v: number) => formatKRW(v).replace("₩", "")} axisLine={false} tickLine={false} />
                 <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} width={150} />
                 <Tooltip
-                  cursor={{ fill: "#122544", opacity: 0.4 }}
+                  cursor={{ fill: "#efeade", opacity: 0.6 }}
                   content={({ active, payload }) =>
                     active && payload?.length ? (
                       <ChartTooltip rows={[{ name: String(payload[0].payload.name), value: formatKRW(payload[0].payload.value), color: "#22d3ee" }]} />

@@ -16,6 +16,8 @@ export const BRAND = {
   logo: {
     /** 가로형 전체 로고 767×160 */
     full: "/brand/mirae-ai-lab-logo.png",
+    /** 어두운 배경(사이드바)용 밝은 워드마크 */
+    fullLight: "/brand/mirae-ai-lab-logo-light.png",
     fullRatio: 767 / 160,
     /** 심볼(M 마크) 236×160 */
     symbol: "/brand/mirae-ai-lab-symbol.png",

@@ -5,7 +5,9 @@ import { ChannelShare } from "@/lib/types";
 import { formatKRW } from "@/lib/format";
 import ChartTooltip from "./ChartTooltip";
 
-export const DONUT_COLORS = ["#1478ff", "#16bfd6", "#8b7bf5", "#cbd5e1", "#f59e0b", "#34d399"];
+import { chartColors } from "@/lib/palette";
+
+export const DONUT_COLORS = chartColors(7);
 
 /** 채널별 매출 비중 도넛 차트 + 중앙 총매출 표시 */
 export default function ChannelDonut({ shares }: { shares: ChannelShare[] }) {

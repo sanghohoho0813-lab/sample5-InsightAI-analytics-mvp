@@ -5,8 +5,16 @@
 데이터를 업로드하면 AI가 **핵심 KPI → 이상징후 → 추세 → 예측 → 인사이트 → 실행 제안**까지
 한 번에 정리해주는 데이터 인사이트 SaaS MVP입니다.
 
-첨부 디자인 레퍼런스를 기준으로 한 **라이트 Analytics UI**(화이트 카드 + Electric Blue 액센트)이며,
+**웜 아이보리 캔버스 + 그래파이트 다크 사이드바 + 다색 액센트** 구성의 라이트 Analytics UI이며,
 데스크톱 고밀도 대시보드와 모바일 전용 홈(오늘의 비즈니스 요약) + 하단 네비게이션(중앙 AI 버튼)을 모두 지원합니다.
+
+## 라우팅
+
+| 경로 | 화면 |
+|---|---|
+| `/` | `/dashboard`로 리다이렉트 (대표 도메인 진입 시 바로 대시보드) |
+| `/dashboard` | 홈 대시보드 — 데이터가 없으면 데모 데이터셋을 자동 연결해 빈 화면을 보이지 않음 |
+| `/intro` | 서비스 소개(랜딩) — 앱 하단 크레딧에서 이동 |
 
 ## 브랜딩
 
@@ -75,14 +83,24 @@ Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · Recharts · Lucide Ic
 
 ### 디자인 토큰
 
+블루 단색 위주에서 벗어나 **6종 이상의 액센트**를 한 톤으로 묶었습니다(`lib/palette.ts`).
+상태색(상승·주의·하락)도 같은 액센트를 재사용해 화면 전체가 하나의 색 체계로 읽힙니다.
+
 | 역할 | 값 |
 |---|---|
-| 배경 / 카드 | `#f4f7fc` / `#ffffff` |
-| 보더 | `#e9eef7` (강조 `#dbe3ef`) |
-| 브랜드 | `#1478ff` (hover `#0b5fd6`, soft `#ecf3ff`) — 미래에이아이랩 로고 블루 |
-| 텍스트 | `#09242d` / `#5a6b78` / `#8b9aa6` |
-| 상태 | 상승 `#16a34a` · 주의 `#f97316` · 하락 `#ef4444` |
-| 차트 | `#1478ff` · `#16bfd6` · `#8b7bf5` · `#cbd5e1` |
+| 캔버스 / 카드 | `#f7f4ec` (웜 아이보리) / `#ffffff` |
+| 보더 | `#e9e3d7` (강조 `#d9d1c1`) |
+| 사이드바 | `#23262c` · 활성 `#2d3138` · 텍스트 `#c7ccd4` |
+| 텍스트 | `#23272e` / `#5f6570` / `#8f96a1` |
+| **액센트 6종+** | 블루 `#1478ff` · 시안 `#12a9bf` · 민트 `#2fa36b` · 앰버 `#d1892c` · 코랄 `#dd6350` · 바이올렛 `#7360e8` · 로즈 `#c9558c` |
+| 상태 | 상승=민트 · 주의=앰버 · 하락=코랄 |
+
+색상은 의미와 1:1로 묶여 있습니다.
+
+- **사이드바 메뉴**: 항목마다 고유 색상 아이콘 칩 (홈=블루, 분석=바이올렛, 탐색=시안, 예측=민트, 이상감지=코랄, 알림=로즈 …)
+- **KPI 카드**: 매출=블루 · 주문=바이올렛 · 고객=시안 · 전환율=민트 · 객단가=앰버 — 선택하면 추이 차트 라인·영역·툴팁이 그 색을 따라갑니다
+- **인사이트 / 실행 제안**: 카테고리·우선순위별 색 구분
+- **도넛·막대 차트**: 7색 카테고리 팔레트 순환
 
 ## AI 구조
 
@@ -105,7 +123,7 @@ components/     MetricCard, InsightCard, AnomalyCard, ForecastCard, MobileHome,
                 InsightCarousel, Sidebar, TopBar, MobileNav, DateRangePicker,
                 NotificationBell, DataTable, UploadPanel, MiraeLogo, AppFooter, charts/ ...
 lib/            analytics-engine, anomaly-engine, forecast-engine,
-                insight-generator, notifications, ai, csv, demo-data, store, brand
-public/brand/   미래에이아이랩 로고 (가로형 전체 · 심볼, 배경 제거 PNG)
+                insight-generator, notifications, ai, csv, demo-data, store, brand, palette
+public/brand/   미래에이아이랩 로고 (가로형 전체 · 다크배경용 밝은 버전 · 심볼, 배경 제거 PNG)
 supabase/       schema.sql
 ```
