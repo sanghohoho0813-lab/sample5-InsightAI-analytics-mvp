@@ -16,6 +16,23 @@
 | `/dashboard` | 홈 대시보드 — 데이터가 없으면 데모 데이터셋을 자동 연결해 빈 화면을 보이지 않음 |
 | `/intro` | 서비스 소개(랜딩) — 앱 하단 크레딧에서 이동 |
 
+## 샘플 브릿지 CTA
+
+샘플을 다 본 사용자를 상담 / 다른 샘플 / 홈페이지로 연결하는 공통 CTA 섹션입니다.
+`components/SampleBridgeCTA.tsx` 하나로 관리되며 모든 화면 하단에 동일하게 노출됩니다.
+
+| 수정 대상 | 위치 |
+|---|---|
+| 링크 주소 (상담·다른 샘플·홈페이지) | `lib/brand.ts` → `BRAND.links` |
+| CTA 문구 (배지·헤드라인·설명·버튼) | `components/SampleBridgeCTA.tsx` → `CTA_COPY` |
+| 페이지별 링크 덮어쓰기 | `<SampleBridgeCTA consultHref samplesHref homeHref />` props |
+
+- 메인 CTA `우리 회사도 만들어보기` → `/business-diagnosis`
+- 서브 `다른 샘플 보기` → `/business-services`, `미래AI랩 홈페이지` → `/`
+- 강조는 절제: 6.5초 주기의 옅은 light sweep + 5.5초 배지 glow + hover lift만 사용하고
+  `prefers-reduced-motion`에서는 모두 비활성화됩니다.
+- 로고 중복을 피하려고 CTA 안에는 로고를 넣지 않고, 하단 크레딧에만 작은 심볼을 둡니다.
+
 ## 브랜딩
 
 제작 주체가 한눈에 드러나도록 미래에이아이랩 아이덴티티를 전 화면에 배치했습니다.
@@ -125,7 +142,8 @@ app/            페이지 (랜딩, dashboard, analytics, explore, insights, ai,
                 forecast, anomalies, notifications, reports, data, settings, more)
 components/     MetricCard, InsightCard, AnomalyCard, ForecastCard, MobileHome,
                 InsightCarousel, Sidebar, TopBar, MobileNav, DateRangePicker,
-                NotificationBell, DataTable, UploadPanel, MiraeLogo, AppFooter, charts/ ...
+                NotificationBell, DataTable, UploadPanel, MiraeLogo, AppFooter,
+                SampleBridgeCTA, LiveClock, charts/ ...
 lib/            analytics-engine, anomaly-engine, forecast-engine,
                 insight-generator, notifications, ai, csv, demo-data, store, brand, palette
 public/brand/   미래에이아이랩 로고 (가로형 전체 · 다크배경용 밝은 버전 · 심볼, 배경 제거 PNG)

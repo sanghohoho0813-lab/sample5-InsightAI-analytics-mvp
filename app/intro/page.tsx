@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight, BrainCircuit, LineChart, Sparkles, TrendingUp, Upload } from "lucide-react";
 import Logo from "@/components/Logo";
 import { MiraeSymbol, MiraeWordmark } from "@/components/MiraeLogo";
+import SampleBridgeCTA from "@/components/SampleBridgeCTA";
 import { BRAND } from "@/lib/brand";
 import { getDemoDatasets } from "@/lib/demo-data";
 import { useApp } from "@/lib/store";
@@ -117,6 +118,10 @@ export default function Home() {
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="relative mx-auto max-w-5xl px-5 pb-20">
+        <SampleBridgeCTA />
       </section>
 
       <footer className="relative border-t border-line bg-surface">

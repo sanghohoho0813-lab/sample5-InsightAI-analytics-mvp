@@ -191,3 +191,60 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     content: "";
   }
 }
+
+/* ── 샘플 브릿지 CTA ─────────────────────────────────────────
+   광고 배너처럼 보이지 않도록 아주 절제된 강조만 준다.          */
+.cta-surface {
+  background:
+    radial-gradient(120% 140% at 50% -20%, rgba(20, 120, 255, 0.09), transparent 62%),
+    linear-gradient(180deg, #ffffff 0%, #fbfaf6 100%);
+  box-shadow: 0 2px 20px rgba(60, 50, 35, 0.06);
+}
+
+/* 메인 CTA — 6.5초에 한 번, 약 2초 동안 지나가는 light sweep */
+.cta-sweep::after {
+  content: "";
+  position: absolute;
+  inset-block: -50%;
+  left: 0;
+  width: 42%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transform: translateX(-180%) skewX(-18deg);
+  animation: cta-sweep 6.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes cta-sweep {
+  0%,
+  70% {
+    transform: translateX(-180%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(340%) skewX(-18deg);
+  }
+}
+
+/* 배지 — 아주 느리고 옅은 glow */
+.cta-badge {
+  animation: cta-badge-glow 5.5s ease-in-out infinite;
+}
+
+@keyframes cta-badge-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(20, 120, 255, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(20, 120, 255, 0.07);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta-sweep::after {
+    display: none;
+  }
+  .cta-badge {
+    animation: none;
+  }
+}
