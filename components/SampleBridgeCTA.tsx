@@ -32,49 +32,49 @@ export default function SampleBridgeCTA({
   className?: string;
 }) {
   const subLink =
-    "inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface whitespace-nowrap px-5 text-[18px] font-semibold text-ink-soft transition-colors hover:border-brand/40 hover:text-brand";
+    "inline-flex min-h-12 items-center justify-center gap-2 rounded-control border border-line-strong bg-surface whitespace-nowrap px-5 text-sub font-semibold text-ink-soft transition-colors hover:border-ink-dim hover:text-ink";
 
   return (
     <section
       aria-labelledby="sample-bridge-cta-title"
-      className={`cta-surface animate-fade-up overflow-hidden rounded-3xl border border-brand/15 px-6 py-10 text-center md:px-10 md:py-12 ${className}`}
+      className={`cta-surface overflow-hidden rounded-panel border border-line px-5 py-10 text-center md:px-10 md:py-12 ${className}`}
     >
-      <p className="cta-badge inline-flex items-center rounded-full border border-brand/25 bg-surface px-3.5 py-1.5 text-[14px] font-bold tracking-[0.16em] text-brand">
+      <p className="cta-badge inline-flex items-center rounded-full border border-brand/25 bg-surface px-3 py-1 text-caption font-bold tracking-[0.14em] text-brand">
         {CTA_COPY.badge}
       </p>
 
-      <p className="mt-4 break-keep text-[18px] font-semibold text-ink-soft">{CTA_COPY.eyebrow}</p>
+      <p className="mt-4 text-sub font-semibold text-ink-soft">{CTA_COPY.eyebrow}</p>
 
       <h2
         id="sample-bridge-cta-title"
-        className="mx-auto mt-2 max-w-[22ch] whitespace-pre-line break-keep text-[26px] font-bold leading-[1.35] tracking-tight text-ink sm:max-w-none sm:text-[30px]"
+        className="mx-auto mt-2 max-w-[20ch] whitespace-pre-line text-title font-bold tracking-tight text-ink sm:max-w-none"
       >
         {CTA_COPY.headline}
       </h2>
 
-      <p className="mx-auto mt-3.5 max-w-[60ch] whitespace-pre-line break-keep text-[18px] leading-relaxed text-ink-soft">
+      <p className="mx-auto mt-3 max-w-[60ch] text-body text-ink-soft md:whitespace-pre-line">
         {CTA_COPY.description}
       </p>
 
-      <div className="mt-8 flex flex-col items-center gap-4">
+      <div className="mt-8 flex flex-col items-center gap-3">
         <a
           href={consultHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="cta-sweep relative isolate inline-flex min-h-[60px] w-full max-w-[420px] items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-gradient-to-r from-brand to-brand-dark whitespace-nowrap px-6 text-[19px] font-bold text-white sm:px-8 sm:text-[21px] shadow-[0_10px_28px_-12px_rgba(20,120,255,0.65)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_38px_-12px_rgba(20,120,255,0.7)] sm:w-auto"
+          className="cta-sweep relative isolate inline-flex min-h-14 w-full max-w-[400px] items-center justify-center gap-2 overflow-hidden rounded-control bg-brand whitespace-nowrap px-6 text-lead font-bold text-white shadow-raised transition-colors hover:bg-brand-dark sm:w-auto sm:px-8"
         >
           {CTA_COPY.primary}
-          <ArrowRight className="h-6 w-6" />
+          <ArrowRight className="h-5 w-5" aria-hidden />
         </a>
 
-        <div className="flex w-full flex-col items-center gap-2.5 sm:w-auto sm:flex-row">
+        <div className="flex w-full flex-col items-center gap-2 sm:w-auto sm:flex-row">
           <a href={samplesHref} target="_blank" rel="noopener noreferrer" className={`${subLink} w-full sm:w-auto`}>
             {CTA_COPY.samples}
-            <ArrowUpRight className="h-5 w-5" />
+            <ArrowUpRight className="h-4 w-4" aria-hidden />
           </a>
           <a href={homeHref} target="_blank" rel="noopener noreferrer" className={`${subLink} w-full sm:w-auto`}>
             {CTA_COPY.home}
-            <ArrowUpRight className="h-5 w-5" />
+            <ArrowUpRight className="h-4 w-4" aria-hidden />
           </a>
         </div>
       </div>

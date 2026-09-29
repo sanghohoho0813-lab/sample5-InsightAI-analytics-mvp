@@ -1,27 +1,42 @@
+"use client";
+
 import Link from "next/link";
-import { MiraeSymbol } from "./MiraeLogo";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import SampleBridgeCTA from "./SampleBridgeCTA";
 import { BRAND } from "@/lib/brand";
 
 /**
- * 모든 앱 화면 하단 — 공통 브릿지 CTA + 최소 크레딧.
- * 로고는 사이드바·툴바에 이미 있으므로 여기서는 심볼만 작게 쓴다.
+ * 제작사 브릿지 CTA는 '한 흐름을 다 본 뒤'에만 보여준다.
+ * - 대시보드: 첫 화면 끝까지 본 방문자
+ * - 저장된 보고서 상세: 핵심 흐름 완료 지점
+ * - 더보기(모바일 메뉴)
+ * 분석·이상 감지·데이터·설정 같은 작업 중 화면에는 외부 CTA를 두지 않는다.
  */
-export default function AppFooter() {
-  return (
-    <footer className="mt-10">
-      <SampleBridgeCTA />
+function FooterInner() {
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const showCta =
+    pathname === "/dashboard" || pathname === "/more" || (pathname === "/reports" && params.has("id"));
 
-      <div className="mt-7 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 border-t border-line pt-6 text-center text-[15px] text-ink-dim">
-        <MiraeSymbol height={24} />
-        <span>
-          © {BRAND.company} · {BRAND.product} {BRAND.productTagline} 데모
-        </span>
-        <span className="hidden h-3.5 w-px bg-line-strong sm:block" />
-        <Link href="/intro" className="font-semibold text-brand transition-colors hover:text-brand-dark">
+  return (
+    <footer className="mt-12">
+      {showCta && <SampleBridgeCTA className="mb-8" />}
+      {/* 데스크톱은 사이드바에 제작 표기가 있으므로 모바일에서만 한 줄 크레딧을 둔다 */}
+      <p className="border-t border-line pt-6 text-center text-caption text-ink-dim lg:hidden">
+        © {BRAND.company} · {BRAND.product} 데모 ·{" "}
+        <Link href="/intro" className="font-semibold text-ink-soft underline-offset-2 hover:underline">
           서비스 소개
         </Link>
-      </div>
+      </p>
     </footer>
+  );
+}
+
+export default function AppFooter() {
+  return (
+    <Suspense fallback={null}>
+      <FooterInner />
+    </Suspense>
   );
 }

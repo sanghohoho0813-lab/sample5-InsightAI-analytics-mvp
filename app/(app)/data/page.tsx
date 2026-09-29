@@ -1,111 +1,147 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, Database, Play, Table2, Upload } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
-import SectionHeader from "@/components/SectionHeader";
+import PageSkeleton from "@/components/PageSkeleton";
 import UploadPanel from "@/components/UploadPanel";
 import DataTable from "@/components/DataTable";
-import { useApp } from "@/lib/store";
+import { Panel, PanelHeader } from "@/components/Panel";
+import { findDataset, useApp } from "@/lib/store";
 import { getDemoDatasets } from "@/lib/demo-data";
-import { formatDateKR } from "@/lib/format";
+import { btn } from "@/lib/ui";
+
+const DATETIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
 
 export default function DataPage() {
-  const { dataset, history, startAnalysis, openAnalysis } = useApp();
+  const { ready, dataset, history, startAnalysis, openAnalysis } = useApp();
   const demos = getDemoDatasets();
+  const [showPreview, setShowPreview] = useState(false);
   // 데모 기간은 접속 시점 기준으로 계산되므로 하이드레이션 이후에 표시한다.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // 업로드 원본이 브라우저에 남아 있는지 — 다시 열기 가능 여부
+  const reopenable = useMemo(() => {
+    if (!mounted) return new Set<string>();
+    return new Set(history.filter((h) => findDataset(h.datasetId)).map((h) => h.id));
+  }, [history, mounted]);
+
+  if (!ready) return <PageSkeleton />;
+
   return (
     <>
-      <PageHeader subtitle="데이터를 업로드하거나 샘플 데이터로 시작하세요" />
-
-      <section>
-        <SectionHeader title="데이터 업로드" icon={<Upload className="h-6 w-6 text-brand" />} />
-        <UploadPanel />
-      </section>
-
-      <section className="mt-6">
-        <SectionHeader title="샘플 데이터로 시작하기" icon={<Database className="h-6 w-6 text-aqua" />} />
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {demos.map((ds, i) => {
-            const active = dataset?.id === ds.id;
-            return (
-              <div key={ds.id} className={`card card-hover animate-fade-up flex flex-col p-4 ${active ? "border-brand" : ""}`} style={{ animationDelay: `${i * 70}ms` }}>
-                <div className="flex items-center justify-between">
-                  <span className="rounded-md bg-line px-2 py-0.5 text-[16px] font-medium text-ink-soft">{ds.category}</span>
-                  {active && (
-                    <span className="flex items-center gap-1 text-[16.5px] font-medium text-positive">
-                      <CheckCircle2 className="h-5 w-5" /> 분석 중
-                    </span>
-                  )}
-                </div>
-                <p className="mt-2.5 text-[21px] font-semibold">{ds.name}</p>
-                <p className="mt-1 flex-1 text-[18px] leading-relaxed text-ink-soft">{ds.description}</p>
-                <p className="mt-2 text-[16.5px] text-ink-dim" suppressHydrationWarning>
-                  {mounted ? `${ds.periodLabel} · ` : ""}{ds.rows.length.toLocaleString("ko-KR")}행
-                </p>
-                <button
-                  onClick={() => startAnalysis(ds)}
-                  className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-brand-soft px-3.5 py-2 text-[19px] font-semibold text-brand transition-colors hover:bg-brand hover:text-white"
-                >
-                  <Play className="h-5 w-5" /> {active ? "다시 분석" : "분석 시작"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <PageHeader
+        title="데이터"
+        description="분석할 데이터를 올리거나 샘플 데이터를 고릅니다. 분석 기록에서 이전 분석을 다시 열 수 있습니다."
+      />
 
       {dataset && (
-        <section className="mt-6">
-          <SectionHeader title={`데이터 미리보기 — ${dataset.name}`} icon={<Table2 className="h-6 w-6 text-brand" />} />
-          <div className="card animate-fade-up p-4">
-            <DataTable rows={dataset.rows} />
+        <Panel className="mb-6 p-5 md:p-6" aria-labelledby="current-data">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-caption font-semibold text-ink-dim">지금 분석 중인 데이터</p>
+              <h2 id="current-data" className="mt-1 text-card font-bold text-ink">
+                {dataset.name}
+              </h2>
+              <p className="mt-1 text-meta text-ink-soft" suppressHydrationWarning>
+                {dataset.id.startsWith("demo-") ? "샘플 데이터" : "업로드한 파일"} · {mounted ? dataset.periodLabel : ""} ·{" "}
+                {dataset.rows.length.toLocaleString("ko-KR")}행 · 채널 {dataset.channels.length}개 · 상품 {dataset.products.length}개
+              </p>
+            </div>
+            <button onClick={() => setShowPreview((v) => !v)} aria-expanded={showPreview} className={btn.secondary}>
+              {showPreview ? "미리보기 닫기" : "원본 미리보기"}
+            </button>
           </div>
-        </section>
+          {showPreview && (
+            <div className="mt-5">
+              <DataTable rows={dataset.rows} />
+            </div>
+          )}
+        </Panel>
       )}
 
-      <section className="mt-6">
-        <SectionHeader title="분석 히스토리" icon={<Clock className="h-6 w-6 text-ink-soft" />} />
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+        <section aria-labelledby="upload-title" className="min-w-0">
+          <h2 id="upload-title" className="mb-3 text-card font-bold text-ink">
+            내 파일 올리기
+          </h2>
+          <UploadPanel />
+        </section>
+
+        <section aria-labelledby="sample-title" className="min-w-0">
+          <h2 id="sample-title" className="mb-3 text-card font-bold text-ink">
+            샘플 데이터
+          </h2>
+          <Panel as="div">
+            <ul className="divide-y divide-line">
+              {demos.map((ds) => {
+                const active = dataset?.id === ds.id;
+                return (
+                  <li key={ds.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-body font-semibold text-ink">
+                        {ds.name}
+                        {active && <span className="ml-2 text-caption font-semibold text-brand">분석 중</span>}
+                      </p>
+                      <p className="mt-1 text-meta text-ink-soft">{ds.description}</p>
+                    </div>
+                    <button onClick={() => startAnalysis(ds)} className={btn.secondary}>
+                      {active ? "다시 분석" : "분석하기"}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </Panel>
+        </section>
+      </div>
+
+      <Panel className="mt-6" aria-labelledby="history-title">
+        <PanelHeader
+          id="history-title"
+          title="분석 기록"
+          description={history.length ? `${history.length}건 · 최신순 · 이 브라우저에 보관` : undefined}
+        />
         {history.length === 0 ? (
-          <div className="card p-6 text-center text-[19px] text-ink-dim animate-fade-up">
-            아직 분석 기록이 없습니다. 샘플 데이터로 첫 분석을 시작해보세요.
-          </div>
+          <p className="px-5 pb-8 pt-6 text-center text-sub text-ink-dim md:px-6">
+            아직 분석 기록이 없습니다. 샘플 데이터나 파일로 첫 분석을 시작해보세요.
+          </p>
         ) : (
-          <div className="card animate-fade-up overflow-x-auto">
-            <table className="w-full min-w-[900px] text-[19px]">
-              <thead>
-                <tr className="border-b border-line bg-surface-soft text-left text-[17px] uppercase tracking-wide text-ink-dim">
-                  <th className="px-4 py-2.5 font-medium">분석명</th>
-                  <th className="px-4 py-2.5 font-medium">Dataset</th>
-                  <th className="px-4 py-2.5 font-medium">분석일</th>
-                  <th className="px-4 py-2.5 font-medium">주요 Insight</th>
-                  <th className="px-4 py-2.5 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((h) => (
-                  <tr
-                    key={h.id}
-                    onClick={() => openAnalysis(h)}
-                    className="cursor-pointer border-b border-line/60 transition-colors last:border-0 hover:bg-surface-soft"
-                  >
-                    <td className="px-4 py-3 font-medium">{h.name}</td>
-                    <td className="px-4 py-3 text-ink-soft">{h.datasetName}</td>
-                    <td className="tabular px-4 py-3 text-ink-soft">{formatDateKR(h.createdAt.slice(0, 10))}</td>
-                    <td className="max-w-[240px] truncate px-4 py-3 text-ink-soft">{h.keyInsight}</td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-md bg-positive-soft px-2 py-0.5 text-[16.5px] font-medium text-positive">완료</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ul className="mt-2 divide-y divide-line">
+            {history.map((h) => {
+              const canOpen = reopenable.has(h.id);
+              const isCurrent = dataset?.id === h.datasetId;
+              return (
+                <li key={h.id} className="flex flex-wrap items-center gap-3 px-5 py-4 md:px-6">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-body font-semibold text-ink">{h.datasetName}</p>
+                    <p className="mt-1 text-meta text-ink-dim" suppressHydrationWarning>
+                      {mounted ? DATETIME.format(new Date(h.createdAt)) : ""} · {h.datasetId.startsWith("demo-") ? "샘플" : "업로드"}
+                      {h.revenueChangePct != null && (
+                        <>
+                          {" "}· 매출 {h.revenueChangePct >= 0 ? "+" : ""}
+                          {h.revenueChangePct}%
+                        </>
+                      )}
+                      {h.alertCount != null && <> · 주의 {h.alertCount}건</>}
+                    </p>
+                    <p className="mt-1 text-sub text-ink-soft">{h.keyInsight}</p>
+                  </div>
+                  {canOpen ? (
+                    <button onClick={() => openAnalysis(h)} className={btn.secondary}>
+                      {isCurrent ? "대시보드로" : "다시 열기"}
+                    </button>
+                  ) : (
+                    <span className="text-meta text-ink-dim" title="원본 파일이 브라우저에 남아 있지 않습니다">
+                      원본 없음 · 재업로드 필요
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </section>
+      </Panel>
     </>
   );
 }

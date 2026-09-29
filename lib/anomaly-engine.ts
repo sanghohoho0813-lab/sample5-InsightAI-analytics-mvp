@@ -1,12 +1,21 @@
 import { dailySeries, filterDimensions, resolveDates } from "./analytics-engine";
 import { formatDateKR } from "./format";
-import { Anomaly, DataRow, Filters, Severity } from "./types";
+import { Anomaly, DataRow, Filters, MetricKey, Severity } from "./types";
 
 interface MetricDef {
   key: "revenue" | "visitors" | "orders" | "conversionRate" | "aov";
   label: string;
   goodWhenUp: boolean;
 }
+
+/** 이상치 지표 → 분석 화면 지표 (트래픽은 별도 KPI가 없어 매출 추이로 연결) */
+const DRILL_METRIC: Record<MetricDef["key"], MetricKey> = {
+  revenue: "revenue",
+  visitors: "revenue",
+  orders: "orders",
+  conversionRate: "conversion",
+  aov: "aov",
+};
 
 const METRICS: MetricDef[] = [
   { key: "revenue", label: "매출", goodWhenUp: true },
@@ -75,6 +84,8 @@ export function detectAnomalies(rows: DataRow[], filters: Filters): Anomaly[] {
           metric: m.label,
           date: series[i].date,
           deltaPct: +delta.toFixed(1),
+          channel: scope !== "전체" ? scope : undefined,
+          metricKey: DRILL_METRIC[m.key],
           detail: `${formatDateKR(series[i].date)} 기준 ${basis} ${Math.abs(delta).toFixed(1)}% ${isDrop ? "감소" : "상승"}. 7일 평균 ${Math.round(mean).toLocaleString("ko-KR")}, 당일 값 ${Math.round(today).toLocaleString("ko-KR")}.`,
         });
       }

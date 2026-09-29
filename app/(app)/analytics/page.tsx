@@ -1,150 +1,229 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import PageHeader from "@/components/PageHeader";
-import FilterBar from "@/components/FilterBar";
+import PageSkeleton from "@/components/PageSkeleton";
+import FilterToolbar from "@/components/FilterToolbar";
 import EmptyState from "@/components/EmptyState";
-import RevenueTrendChart, { TrendMetric } from "@/components/charts/RevenueTrendChart";
+import KpiStrip from "@/components/KpiStrip";
+import { Panel, PanelHeader } from "@/components/Panel";
+import RevenueTrendChart from "@/components/charts/RevenueTrendChart";
 import ChartTooltip from "@/components/charts/ChartTooltip";
-import MetricCard from "@/components/MetricCard";
 import { useApp } from "@/lib/store";
 import { computeKpis, exploreSeries, trendSeries } from "@/lib/analytics-engine";
-import { formatDateKR, formatDateShort, formatKRW } from "@/lib/format";
+import { formatKRW, formatNumber } from "@/lib/format";
+import { COLORS } from "@/lib/palette";
+import { MetricKey } from "@/lib/types";
+import { field } from "@/lib/ui";
 
-export default function AnalyticsPage() {
-  const { dataset, filters } = useApp();
-  const [metric, setMetric] = useState<TrendMetric>("revenue");
+type BreakMetric = "revenue" | "orders" | "customers" | "conversionRate" | "adSpend";
+type Dimension = "channel" | "product" | "customerType";
+
+const BREAK_METRICS: { value: BreakMetric; label: string }[] = [
+  { value: "revenue", label: "매출" },
+  { value: "orders", label: "주문 수" },
+  { value: "customers", label: "고객 수" },
+  { value: "conversionRate", label: "전환율" },
+  { value: "adSpend", label: "광고비" },
+];
+const DIMENSIONS: { value: Dimension; label: string }[] = [
+  { value: "channel", label: "채널" },
+  { value: "product", label: "상품" },
+  { value: "customerType", label: "고객 유형" },
+];
+const METRIC_KEYS: MetricKey[] = ["revenue", "orders", "customers", "conversion", "aov"];
+
+function AnalyticsView() {
+  const params = useSearchParams();
+  const { ready, dataset, filters, setFilters } = useApp();
+  const initial = params.get("metric") as MetricKey | null;
+  const [metric, setMetric] = useState<MetricKey>(initial && METRIC_KEYS.includes(initial) ? initial : "revenue");
+  const [dimension, setDimension] = useState<Dimension>("channel");
+  const [breakMetric, setBreakMetric] = useState<BreakMetric>("revenue");
+
+  // 인사이트·이상치에서 다른 지표로 다시 들어오면 그 지표를 연다.
+  useEffect(() => {
+    if (initial && METRIC_KEYS.includes(initial)) setMetric(initial);
+  }, [initial]);
 
   const data = useMemo(() => {
     if (!dataset) return null;
+    // 분해 차트는 해당 차원의 필터를 풀어 전체 항목을 보여주고, 선택된 항목만 강조한다.
+    const breakFilters =
+      dimension === "channel" ? { ...filters, channel: "all" } : dimension === "product" ? { ...filters, product: "all" } : filters;
     return {
       kpis: computeKpis(dataset.rows, filters),
       trend: trendSeries(dataset.rows, filters),
-      byChannel: exploreSeries(dataset.rows, filters, "revenue", "channel"),
-      byProduct: exploreSeries(dataset.rows, filters, "revenue", "product"),
+      breakdown: exploreSeries(dataset.rows, breakFilters, breakMetric, dimension),
     };
-  }, [dataset, filters]);
+  }, [dataset, filters, dimension, breakMetric]);
 
+  if (!ready) return <PageSkeleton />;
   if (!dataset || !data) {
     return (
       <>
-        <PageHeader subtitle="지난 기간 동안 가장 큰 변화가 있었던 지표입니다" />
+        <PageHeader title="분석" />
         <EmptyState />
       </>
     );
   }
 
-  const convSeries = data.trend.map((p) => ({ date: p.date, conversionRate: p.conversionRate, aov: p.aov }));
+  const isPct = breakMetric === "conversionRate";
+  const isMoney = breakMetric === "revenue" || breakMetric === "adSpend";
+  const fmt = (v: number) => (isPct ? `${v.toFixed(2)}%` : isMoney ? formatKRW(v) : formatNumber(v));
+  const total = data.breakdown.reduce((a, s) => a + s.value, 0) || 1;
+  const selectedName = dimension === "channel" ? filters.channel : dimension === "product" ? filters.product : "all";
+  const canDrill = dimension !== "customerType";
+  const estimated = dimension === "customerType" && !["customers", "orders"].includes(breakMetric);
+  const unavailable = dimension === "customerType" && breakMetric === "conversionRate";
+
+  const pick = (name: string) => {
+    if (!canDrill) return;
+    const next = selectedName === name ? "all" : name;
+    setFilters(dimension === "channel" ? { channel: next } : { product: next });
+  };
 
   return (
     <>
-      <PageHeader subtitle={`${dataset.name} · 최근 ${filters.rangeDays}일 상세 분석`} />
-      <FilterBar dataset={dataset} />
+      <PageHeader
+        title="분석"
+        description="지표를 고르면 추이가 바뀌고, 채널·상품 막대를 누르면 그 항목으로 범위가 좁혀집니다."
+      />
+      <FilterToolbar dataset={dataset} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-        {data.kpis.map((kpi, i) => (
-          <MetricCard
-            key={kpi.key}
-            kpi={kpi}
-            delay={i * 60}
-            selected={metric === kpi.key}
-            onSelect={() => setMetric(kpi.key as TrendMetric)}
-          />
-        ))}
-      </div>
+      <KpiStrip kpis={data.kpis} selected={metric} onSelect={setMetric} />
 
-      <div className="mt-4">
+      <div className="mt-6">
         <RevenueTrendChart points={data.trend} metric={metric} />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="card card-hover animate-fade-up p-4 md:p-5">
-          <h3 className="mb-3 text-[22.5px] font-semibold">채널별 매출</h3>
-          <div className="h-[240px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.byChannel} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
-                <CartesianGrid stroke="#122544" strokeDasharray="3 6" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} dy={6} />
-                <YAxis tickFormatter={(v: number) => formatKRW(v).replace("₩", "")} axisLine={false} tickLine={false} width={86} />
-                <Tooltip
-                  cursor={{ fill: "#efeade", opacity: 0.6 }}
-                  content={({ active, payload }) =>
-                    active && payload?.length ? (
-                      <ChartTooltip rows={[{ name: String(payload[0].payload.name), value: formatKRW(payload[0].payload.value), color: "#3b82f6" }]} />
-                    ) : null
-                  }
-                />
-                <Bar dataKey="value" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={44} animationDuration={700} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      <Panel className="mt-6" aria-labelledby="breakdown-title">
+        <PanelHeader
+          id="breakdown-title"
+          title={`${DIMENSIONS.find((d) => d.value === dimension)!.label}별 ${BREAK_METRICS.find((m) => m.value === breakMetric)!.label}`}
+          description={
+            unavailable
+              ? "고객 유형별 전환율은 원본 데이터에 없어 계산하지 않습니다."
+              : estimated
+                ? "고객 유형별 금액은 고객 수 비율로 나눈 추정치입니다."
+                : canDrill
+                  ? "행을 누르면 그 항목으로 범위를 좁히고, 다시 누르면 해제됩니다."
+                  : undefined
+          }
+          action={
+            <div className="flex flex-wrap gap-2">
+              <div className="flex rounded-control border border-line bg-surface-soft p-0.5" role="group" aria-label="분해 기준">
+                {DIMENSIONS.map((d) => (
+                  <button
+                    key={d.value}
+                    onClick={() => setDimension(d.value)}
+                    aria-pressed={dimension === d.value}
+                    className={`min-h-10 rounded-[8px] px-3 text-meta font-semibold transition-colors ${
+                      dimension === d.value ? "bg-surface text-ink shadow-subtle" : "text-ink-dim hover:text-ink-soft"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+              <select
+                value={breakMetric}
+                onChange={(e) => setBreakMetric(e.target.value as BreakMetric)}
+                aria-label="분해 지표"
+                className={field}
+              >
+                {BREAK_METRICS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          }
+        />
 
-        <div className="card card-hover animate-fade-up p-4 md:p-5" style={{ animationDelay: "80ms" }}>
-          <h3 className="mb-3 text-[22.5px] font-semibold">상품별 매출</h3>
-          <div className="h-[240px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.byProduct} layout="vertical" margin={{ top: 0, right: 12, left: 8, bottom: 0 }}>
-                <CartesianGrid stroke="#122544" strokeDasharray="3 6" horizontal={false} />
-                <XAxis type="number" tickFormatter={(v: number) => formatKRW(v).replace("₩", "")} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} width={150} />
-                <Tooltip
-                  cursor={{ fill: "#efeade", opacity: 0.6 }}
-                  content={({ active, payload }) =>
-                    active && payload?.length ? (
-                      <ChartTooltip rows={[{ name: String(payload[0].payload.name), value: formatKRW(payload[0].payload.value), color: "#22d3ee" }]} />
-                    ) : null
-                  }
-                />
-                <Bar dataKey="value" fill="#22d3ee" radius={[0, 6, 6, 0]} maxBarSize={22} animationDuration={700} />
-              </BarChart>
-            </ResponsiveContainer>
+        {unavailable ? (
+          <p className="px-5 py-10 text-center text-sub text-ink-dim md:px-6">다른 지표를 선택해주세요.</p>
+        ) : (
+          <div className="grid gap-2 p-5 md:p-6 lg:grid-cols-[1fr_1fr] lg:gap-8">
+            <div className="h-[240px] min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.breakdown} layout="vertical" margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke={COLORS.grid} horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tickFormatter={(v: number) => (isPct ? `${v}%` : isMoney ? formatKRW(v).replace("₩", "") : formatNumber(v))}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} width={96} />
+                  <Tooltip
+                    cursor={{ fill: COLORS.brandSoft }}
+                    content={({ active, payload }) =>
+                      active && payload?.length ? (
+                        <ChartTooltip rows={[{ name: String(payload[0].payload.name), value: fmt(Number(payload[0].value)), color: COLORS.brand }]} />
+                      ) : null
+                    }
+                  />
+                  <Bar
+                    dataKey="value"
+                    radius={[0, 4, 4, 0]}
+                    maxBarSize={22}
+                    animationDuration={500}
+                    onClick={(d: { name?: string }) => d?.name && pick(d.name)}
+                    className={canDrill ? "cursor-pointer" : ""}
+                  >
+                    {data.breakdown.map((b) => (
+                      <Cell
+                        key={b.name}
+                        fill={selectedName === "all" || selectedName === b.name ? COLORS.brand : "#c5d6f2"}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <table className="w-full text-sub">
+              <thead>
+                <tr className="border-b border-line text-left text-caption text-ink-dim">
+                  <th className="py-2 font-semibold">{DIMENSIONS.find((d) => d.value === dimension)!.label}</th>
+                  <th className="py-2 text-right font-semibold">값</th>
+                  <th className="py-2 text-right font-semibold">비중</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.breakdown.map((b) => {
+                  const on = selectedName === b.name;
+                  return (
+                    <tr
+                      key={b.name}
+                      onClick={() => pick(b.name)}
+                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), pick(b.name))}
+                      tabIndex={canDrill ? 0 : undefined}
+                      aria-selected={canDrill ? on : undefined}
+                      className={`border-b border-line/70 last:border-0 ${canDrill ? "cursor-pointer hover:bg-surface-soft" : ""} ${on ? "bg-brand-soft/60" : ""}`}
+                    >
+                      <td className={`py-3 pr-2 ${on ? "font-semibold text-brand" : "text-ink"}`}>{b.name}</td>
+                      <td className="tabular py-3 text-right font-semibold text-ink">{fmt(b.value)}</td>
+                      <td className="tabular py-3 pl-2 text-right text-ink-soft">
+                        {isPct ? "–" : `${((b.value / total) * 100).toFixed(1)}%`}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
-      </div>
-
-      <div className="mt-4 card card-hover animate-fade-up p-4 md:p-5">
-        <h3 className="mb-3 text-[22.5px] font-semibold">전환율 추이</h3>
-        <div className="h-[220px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={convSeries} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="#122544" strokeDasharray="3 6" vertical={false} />
-              <XAxis dataKey="date" tickFormatter={formatDateShort} axisLine={false} tickLine={false} minTickGap={28} dy={6} />
-              <YAxis tickFormatter={(v: number) => `${v}%`} axisLine={false} tickLine={false} width={62} domain={["auto", "auto"]} />
-              <Tooltip
-                content={({ active, payload, label }) =>
-                  active && payload?.length ? (
-                    <ChartTooltip
-                      label={formatDateKR(String(label))}
-                      rows={[{ name: "전환율", value: `${payload[0].payload.conversionRate}%`, color: "#8b5cf6" }]}
-                    />
-                  ) : null
-                }
-              />
-              <Line
-                type="monotone"
-                dataKey="conversionRate"
-                stroke="#8b5cf6"
-                strokeWidth={2.2}
-                dot={false}
-                activeDot={{ r: 4, fill: "#8b5cf6", stroke: "#0a1628", strokeWidth: 2 }}
-                animationDuration={700}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+        )}
+      </Panel>
     </>
+  );
+}
+
+export default function AnalyticsPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <AnalyticsView />
+    </Suspense>
   );
 }

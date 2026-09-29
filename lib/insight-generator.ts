@@ -18,7 +18,7 @@ interface Context {
 export function generateInsights({ rows, filters }: Context): Insight[] {
   const insights: Insight[] = [];
   const shares = channelShares(rows, filters);
-  const { current, previous, currentDates } = applyFilters(rows, filters);
+  const { current, currentDates } = applyFilters(rows, filters);
 
   // 1) 매출 상승/하락 요인: 비중 변화가 가장 큰 채널
   const mover = [...shares].sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct))[0];
@@ -31,6 +31,7 @@ export function generateInsights({ rows, filters }: Context): Insight[] {
       description: `${mover.channel} 채널의 매출 비중이 전 기간 대비 ${Math.abs(mover.changePct).toFixed(1)}%p ${up ? "증가" : "감소"}했습니다.`,
       detail: `현재 ${mover.channel} 채널은 전체 매출의 ${mover.share.toFixed(1)}%(${formatKRW(mover.revenue)})를 차지합니다. ${up ? "해당 채널의 전환 흐름이 개선되고 있어 예산 확대를 검토할 만합니다." : "유입 또는 전환 단계에서 이탈 요인을 점검해보세요."}`,
       impact: up ? "positive" : "negative",
+      drill: { channel: mover.channel, metric: "revenue" },
     });
   }
 
@@ -60,6 +61,7 @@ export function generateInsights({ rows, filters }: Context): Insight[] {
       description: `재구매 고객의 평균 주문액(추정 ${formatKRWExact(retAov)})이 신규 고객(${formatKRWExact(newAov)})보다 ${Math.abs(diff).toFixed(0)}% ${diff >= 0 ? "높습니다" : "낮습니다"}.`,
       detail: `이번 기간 재구매 고객은 ${Math.round(retCus).toLocaleString("ko-KR")}명으로 전체 구매 고객의 ${((retCus / (newCus + retCus)) * 100).toFixed(0)}%입니다. ${diff >= 0 ? "재구매 고객 대상 CRM 캠페인의 기대 효율이 높습니다." : "재구매 고객의 구매 단가를 높일 번들 구성이 필요해 보입니다."}`,
       impact: diff >= 0 ? "positive" : "neutral",
+      drill: { metric: "aov" },
     });
   }
 
@@ -82,6 +84,7 @@ export function generateInsights({ rows, filters }: Context): Insight[] {
       description: `${best.channel} 채널의 광고비 대비 매출(ROAS)이 ${best.roas.toFixed(1)}배로, ${worst.channel}(${worst.roas.toFixed(1)}배)보다 높습니다.`,
       detail: `동일 예산 기준 ${best.channel} 채널의 기대 매출이 ${(best.roas / Math.max(0.1, worst.roas)).toFixed(1)}배 높습니다. 저효율 채널 예산 일부를 이동하는 것을 검토해보세요.`,
       impact: "positive",
+      drill: { channel: best.channel, metric: "revenue" },
     });
   }
 
@@ -110,6 +113,7 @@ export function generateInsights({ rows, filters }: Context): Insight[] {
       description: `'${topProduct.product}'의 매출이 직전 ${half}일 대비 ${topProduct.pct.toFixed(0)}% 증가하며 가장 빠르게 성장하고 있습니다.`,
       detail: `${growthLabel} 매출은 ${formatKRW(topProduct.rec)}입니다. 수요 증가 속도를 고려해 재고와 노출 지면을 미리 확보하는 것이 좋습니다.`,
       impact: "positive",
+      drill: { product: topProduct.product, metric: "revenue" },
     });
   }
 
@@ -129,10 +133,10 @@ export function generateInsights({ rows, filters }: Context): Insight[] {
         ? "최근 유입 품질 또는 구매 경로 개선 효과가 나타나고 있습니다. 변화 시점의 캠페인·UX 변경 사항을 기록해두세요."
         : "결제 단계 이탈, 유입 품질 저하 여부를 우선 점검해보세요.",
       impact: convDelta >= 0 ? "positive" : "negative",
+      drill: { metric: "conversion" },
     });
   }
 
-  const _ = previous; // 이전 기간은 shares 계산에 사용됨
   return insights;
 }
 

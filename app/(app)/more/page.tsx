@@ -1,27 +1,48 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import { NAV_ITEMS } from "@/components/Sidebar";
+import { Panel } from "@/components/Panel";
+import { PRIMARY_NAV, WORKSPACE_NAV } from "@/lib/nav";
 
-/** 모바일 하단 네비게이션의 '더보기' — 전체 메뉴 */
+const TAB_HREFS = ["/dashboard", "/anomalies", "/insights", "/reports"];
+
+/** 모바일 '더보기' — 하단 탭에 없는 메뉴 */
 export default function MorePage() {
+  const groups = [
+    { title: "분석", items: PRIMARY_NAV.filter((n) => !TAB_HREFS.includes(n.href)) },
+    { title: "작업 공간", items: WORKSPACE_NAV },
+    { title: "안내", items: [{ href: "/intro", label: "서비스 소개", hint: "InsightAI가 하는 일", icon: null }] },
+  ];
+
   return (
     <>
-      <PageHeader subtitle="전체 메뉴" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }, i) => (
-          <Link
-            key={href}
-            href={href}
-            className="card card-hover animate-fade-up flex flex-col items-start gap-3 p-4"
-            style={{ animationDelay: `${i * 40}ms` }}
-          >
-            <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-brand-soft">
-              <Icon className="h-7 w-7 text-brand" />
-            </span>
-            <span className="text-[20px] font-semibold">{label}</span>
-          </Link>
+      <PageHeader title="더보기" />
+      <div className="space-y-6">
+        {groups.map((g) => (
+          <section key={g.title} aria-label={g.title}>
+            <h2 className="mb-2 px-1 text-caption font-semibold text-ink-dim">{g.title}</h2>
+            <Panel as="div">
+              <ul className="divide-y divide-line">
+                {g.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.href}>
+                      <Link href={item.href} className="flex min-h-14 items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-soft">
+                        {Icon && <Icon className="h-5 w-5 shrink-0 text-ink-dim" aria-hidden />}
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-body font-semibold text-ink">{item.label}</span>
+                          <span className="block text-meta text-ink-dim">{item.hint}</span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-ink-dim" aria-hidden />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Panel>
+          </section>
         ))}
       </div>
     </>

@@ -1,58 +1,44 @@
 "use client";
 
+import { Check, LoaderCircle } from "lucide-react";
 import { ANALYSIS_STEPS, useApp } from "@/lib/store";
-import { Check, LoaderCircle, Sparkles } from "lucide-react";
-import { MiraeWordmark } from "./MiraeLogo";
 
-/** 분석 시작 시 표시되는 단계별 로딩 오버레이 (AI 분석 과정 연출) */
+/** 분석 진행 표시 — 어떤 단계를 거치는지 짧게 보여준다. */
 export default function AnalysisOverlay() {
   const { analyzing, analysisStep } = useApp();
   if (!analyzing) return null;
 
   return (
-    <div className="animate-fade-in fixed inset-0 z-[100] flex items-center justify-center bg-ink/25 backdrop-blur-sm">
-      <div className="card w-[min(420px,90vw)] p-8 shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-brand-soft">
-            <Sparkles className="h-7 w-7 text-brand" />
-          </div>
-          <div>
-            <p className="font-bold text-ink">AI 분석 진행 중</p>
-            <p className="text-[18px] text-ink-soft">데이터에서 중요한 변화만 찾아드립니다.</p>
-          </div>
-        </div>
-        <ul className="space-y-3">
+    <div
+      className="animate-fade-in fixed inset-0 z-[100] flex items-center justify-center bg-ink/30 px-4"
+      role="alertdialog"
+      aria-live="assertive"
+      aria-label="데이터 분석 진행 중"
+    >
+      <div className="card w-full max-w-[400px] p-6 shadow-overlay">
+        <p className="text-card font-bold text-ink">데이터를 분석하고 있습니다</p>
+        <p className="mt-1 text-meta text-ink-dim">규칙 기반 분석 엔진 · 몇 초면 끝납니다</p>
+        <ol className="mt-5 space-y-3">
           {ANALYSIS_STEPS.map((step, i) => {
             const done = i < analysisStep;
             const active = i === analysisStep;
             return (
               <li
                 key={step}
-                className={`flex items-center gap-3 text-[21px] transition-colors duration-300 ${
-                  done ? "text-ink-soft" : active ? "font-medium text-ink" : "text-ink-dim"
-                }`}
+                className={`flex items-center gap-3 text-body ${done ? "text-ink-soft" : active ? "font-semibold text-ink" : "text-ink-dim"}`}
               >
                 {done ? (
-                  <Check className="h-6 w-6 shrink-0 text-positive" />
+                  <Check className="h-5 w-5 shrink-0 text-positive" aria-hidden />
                 ) : active ? (
-                  <LoaderCircle className="h-6 w-6 shrink-0 animate-spin text-brand" />
+                  <LoaderCircle className="h-5 w-5 shrink-0 animate-spin text-brand" aria-hidden />
                 ) : (
-                  <span className="h-6 w-6 shrink-0 rounded-full border border-line-strong" />
+                  <span className="h-5 w-5 shrink-0 rounded-full border border-line-strong" aria-hidden />
                 )}
                 {step}
               </li>
             );
           })}
-        </ul>
-        <div className="mt-6 flex justify-center border-t border-line pt-4">
-          <MiraeWordmark height={44} />
-        </div>
-        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-line">
-          <div
-            className="h-full rounded-full bg-brand transition-all duration-700"
-            style={{ width: `${((analysisStep + 1) / ANALYSIS_STEPS.length) * 100}%` }}
-          />
-        </div>
+        </ol>
       </div>
     </div>
   );

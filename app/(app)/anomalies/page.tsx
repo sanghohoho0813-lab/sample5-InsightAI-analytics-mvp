@@ -1,78 +1,102 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
-import FilterBar from "@/components/FilterBar";
+import PageSkeleton from "@/components/PageSkeleton";
+import FilterToolbar from "@/components/FilterToolbar";
 import EmptyState from "@/components/EmptyState";
-import AnomalyCard from "@/components/AnomalyCard";
+import AnomalyList from "@/components/AnomalyList";
+import { Panel } from "@/components/Panel";
 import { useApp } from "@/lib/store";
 import { detectAnomalies } from "@/lib/anomaly-engine";
+import { recentAlerts } from "@/lib/notifications";
 import { Severity } from "@/lib/types";
+import { SEVERITY_META, btn } from "@/lib/ui";
 
-const SEVERITY_LABEL: Record<Severity, string> = {
-  critical: "Critical",
-  warning: "Warning",
-  info: "Info",
-};
-const SEVERITY_DOT: Record<Severity, string> = {
-  critical: "bg-negative",
-  warning: "bg-warning",
-  info: "bg-brand",
-};
+type Tab = "all" | Severity;
 
 export default function AnomaliesPage() {
-  const { dataset, filters } = useApp();
+  const { ready, dataset, filters, readIds, markRead } = useApp();
+  const [tab, setTab] = useState<Tab>("all");
 
-  const anomalies = useMemo(
-    () => (dataset ? detectAnomalies(dataset.rows, filters) : []),
-    [dataset, filters.rangeDays]
+  const anomalies = useMemo(() => (dataset ? detectAnomalies(dataset.rows, filters) : []), [dataset, filters]);
+  const read = useMemo(() => new Set(readIds), [readIds]);
+  // '새로움'은 확인이 필요한 등급(위험·주의)에만 단다.
+  const unreadIds = useMemo(
+    () => new Set(anomalies.filter((a) => a.severity !== "info" && !read.has(a.id)).map((a) => a.id)),
+    [anomalies, read]
   );
 
+  if (!ready) return <PageSkeleton />;
   if (!dataset) {
     return (
       <>
-        <PageHeader subtitle="비정상 변화를 자동으로 감지합니다" />
+        <PageHeader title="이상 감지" />
         <EmptyState />
       </>
     );
   }
 
   const counts = anomalies.reduce(
-    (acc, a) => ({ ...acc, [a.severity]: (acc[a.severity] ?? 0) + 1 }),
-    {} as Record<Severity, number>
+    (acc, a) => ({ ...acc, [a.severity]: acc[a.severity] + 1 }),
+    { critical: 0, warning: 0, info: 0 } as Record<Severity, number>
   );
+  const shown = tab === "all" ? anomalies : anomalies.filter((a) => a.severity === tab);
+  const tabs: { value: Tab; label: string; count: number }[] = [
+    { value: "all", label: "전체", count: anomalies.length },
+    { value: "critical", label: SEVERITY_META.critical.label, count: counts.critical },
+    { value: "warning", label: SEVERITY_META.warning.label, count: counts.warning },
+    { value: "info", label: SEVERITY_META.info.label, count: counts.info },
+  ];
+
+  const markAll = () => markRead([...unreadIds, ...recentAlerts(dataset).map((a) => a.id)]);
 
   return (
     <>
-      <PageHeader subtitle={`${dataset.name} · 최근 ${filters.rangeDays}일에서 감지된 비정상 변화`} />
-      <FilterBar dataset={dataset} />
+      <PageHeader
+        title="이상 감지"
+        description={
+          anomalies.length === 0
+            ? "이 범위에서는 감지된 변화가 없습니다."
+            : `${anomalies.length}건 감지 · 위험 ${counts.critical}건, 주의 ${counts.warning}건${unreadIds.size ? ` · 미확인 ${unreadIds.size}건` : ""}`
+        }
+        actions={
+          unreadIds.size > 0 ? (
+            <button onClick={markAll} className={btn.secondary}>
+              모두 확인 처리
+            </button>
+          ) : undefined
+        }
+      />
+      <FilterToolbar dataset={dataset} />
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {(["critical", "warning", "info"] as Severity[]).map((s) => (
-          <span key={s} className="card flex items-center gap-2 px-3.5 py-2 text-[19px]">
-            <span className={`h-2 w-2 rounded-full ${SEVERITY_DOT[s]}`} />
-            <span className="text-ink-soft">{SEVERITY_LABEL[s]}</span>
-            <span className="tabular font-bold">{counts[s] ?? 0}</span>
-          </span>
-        ))}
-      </div>
-
-      {anomalies.length === 0 ? (
-        <div className="card p-10 text-center animate-fade-up">
-          <p className="text-[21px] font-semibold">이 기간에는 특이한 변화가 감지되지 않았습니다</p>
-          <p className="mt-1 text-[19px] text-ink-dim">기간을 넓히거나 다른 채널을 선택해보세요.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-          {anomalies.map((a, i) => (
-            <AnomalyCard key={a.id} anomaly={a} delay={i * 50} />
+      <Panel>
+        <div className="flex gap-1 overflow-x-auto border-b border-line px-3 md:px-4" role="tablist" aria-label="등급">
+          {tabs.map((t) => (
+            <button
+              key={t.value}
+              role="tab"
+              aria-selected={tab === t.value}
+              onClick={() => setTab(t.value)}
+              className={`relative min-h-12 whitespace-nowrap px-3 text-sub font-semibold transition-colors ${
+                tab === t.value ? "text-ink" : "text-ink-dim hover:text-ink-soft"
+              }`}
+            >
+              {t.label} <span className="tabular text-ink-dim">{t.count}</span>
+              {tab === t.value && <span className="absolute inset-x-2 bottom-0 h-[2px] bg-brand" aria-hidden />}
+            </button>
           ))}
         </div>
-      )}
+        <AnomalyList
+          anomalies={shown}
+          unreadIds={unreadIds}
+          onRead={(id) => markRead([id])}
+          empty="이 등급에 해당하는 변화가 없습니다."
+        />
+      </Panel>
 
-      <p className="mt-5 text-[17px] leading-relaxed text-ink-dim">
-        감지 기준: 전일 대비 ±30% 이상 변화 또는 최근 7일 평균 대비 ±2 표준편차 이탈.
-        채널 단위까지 검사해 원인 채널을 함께 표시합니다.
+      <p className="mt-4 text-meta text-ink-dim">
+        감지 규칙(데모): 전일 대비 ±30% 이상 변화, 또는 최근 7일 평균 대비 ±2 표준편차 이탈. 채널 단위까지 검사해 원인 채널을 표시합니다.
       </p>
     </>
   );

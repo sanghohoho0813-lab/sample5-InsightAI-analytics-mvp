@@ -67,6 +67,10 @@ export interface Anomaly {
   date: string;
   deltaPct: number;
   detail: string;
+  /** 원인 채널(전체 합계에서 감지되면 없음) */
+  channel?: string;
+  /** 분석 화면에서 열 지표 */
+  metricKey: MetricKey;
 }
 
 export interface Insight {
@@ -76,7 +80,12 @@ export interface Insight {
   description: string;
   detail: string;
   impact: "positive" | "negative" | "neutral";
+  /** "관련 데이터 보기" 드릴다운 대상 — 분석 화면의 필터·지표로 연결된다. */
+  drill?: { channel?: string; product?: string; metric?: MetricKey };
 }
+
+/** 분석 화면에서 선택 가능한 핵심 지표 */
+export type MetricKey = "revenue" | "orders" | "customers" | "conversion" | "aov";
 
 export interface Recommendation {
   id: string;
@@ -108,9 +117,38 @@ export interface AnalysisRecord {
   name: string;
   datasetName: string;
   createdAt: string;
+  /** 분석 시점에 실제로 계산된 가장 중요한 발견 */
   keyInsight: string;
+  /** 분석 시점 매출 변화율(%) · 감지된 주의 이상치 수 */
+  revenueChangePct?: number;
+  alertCount?: number;
   status: "completed";
   datasetId: string;
+  source: "demo" | "upload";
+  /** 업로드 원본을 브라우저에 보관해 다시 열 수 있는지 여부 */
+  restorable: boolean;
+}
+
+/** 저장된 보고서 — 저장 시점의 계산 결과를 스냅샷으로 보관해 나중에 그대로 다시 연다. */
+export interface SavedReport {
+  id: string;
+  title: string;
+  createdAt: string;
+  datasetId: string;
+  datasetName: string;
+  /** 동일 조건 중복 저장 판단용 (데이터셋·기간·채널·상품) */
+  signature: string;
+  scope: { start: string; end: string; days: number; channel: string; product: string };
+  headline: string;
+  kpis: { key: string; label: string; value: number; prevValue: number; changePct: number; format: KpiResult["format"] }[];
+  findings: { title: string; description: string; impact: Insight["impact"] }[];
+  anomalies: { title: string; description: string; severity: Severity; date: string }[];
+  forecasts: { label: string; next7Total: number; changePct: number; format: "currency" | "number" }[];
+  recommendations: { title: string; description: string; expectedEffect: string; priority: Recommendation["priority"] }[];
+}
+
+export interface AppSettings {
+  defaultPreset: "7" | "30" | "90";
 }
 
 export type RangePreset = "7" | "30" | "90" | "custom";
@@ -123,12 +161,3 @@ export interface Filters {
   product: string; // "all" | product명
 }
 
-export interface NotificationItem {
-  id: string;
-  severity: Severity;
-  title: string;
-  description: string;
-  date: string;
-  metric: string;
-  read: boolean;
-}

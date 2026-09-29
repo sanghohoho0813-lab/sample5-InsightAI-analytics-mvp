@@ -1,18 +1,23 @@
-"use client";
-
-/** 페이지 설명줄 — 타이틀은 상단 툴바(TopBar)가 담당한다. */
+/** 페이지 제목(h1) + 한 줄 설명 + 대표 행동. 화면마다 한 번만 쓴다. */
 export default function PageHeader({
-  subtitle,
+  title,
+  description,
   actions,
+  eyebrow,
 }: {
-  subtitle?: string;
+  title: string;
+  description?: React.ReactNode;
   actions?: React.ReactNode;
+  eyebrow?: React.ReactNode;
 }) {
-  if (!subtitle && !actions) return null;
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-      {subtitle && <p className="text-[19.5px] text-ink-soft">{subtitle}</p>}
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+    <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div className="min-w-0">
+        {eyebrow && <div className="mb-1">{eyebrow}</div>}
+        <h1 className="text-page font-bold tracking-tight text-ink">{title}</h1>
+        {description && <p className="mt-2 text-body text-ink-soft">{description}</p>}
+      </div>
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }

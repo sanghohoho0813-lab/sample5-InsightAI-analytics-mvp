@@ -1,62 +1,88 @@
 @import "tailwindcss";
 
 @theme {
-  /* 표면 — 차가운 회색 대신 따뜻한 아이보리 계열 */
-  --color-canvas: #f7f4ec;
+  /* ── 색상 ─────────────────────────────────────────────
+     브랜드 블루 1계열 + 보조 틸 1색 + 뉴트럴 + 상태색(성공/주의/위험)만 쓴다.
+     메뉴·지표마다 다른 색을 칠하지 않는다. */
+  --color-canvas: #f6f5f1;
   --color-surface: #ffffff;
-  --color-surface-soft: #faf8f2;
-  --color-line: #e9e3d7;
-  --color-line-strong: #d9d1c1;
+  --color-surface-soft: #f9f8f5;
+  --color-line: #e6e3db;
+  --color-line-strong: #d4d0c6;
 
-  /* 사이드바 — 그래파이트 다크 */
-  --color-nav: #23262c;
-  --color-nav-soft: #2d3138;
-  --color-nav-line: #383d46;
-  --color-nav-text: #c7ccd4;
-  --color-nav-dim: #868d99;
+  /* 사이드바 — 뉴트럴 그래파이트 */
+  --color-nav: #202329;
+  --color-nav-soft: #2b2f36;
+  --color-nav-line: #353a42;
+  --color-nav-text: #c3c8d0;
+  --color-nav-dim: #858c97;
 
   /* 브랜드(미래에이아이랩 로고 블루) */
   --color-brand: #1478ff;
   --color-brand-dark: #0b5fd6;
   --color-brand-light: #6aa9ff;
-  --color-brand-soft: #e8f1ff;
+  --color-brand-soft: #eaf2ff;
 
-  /* 액센트 6종 — 상태색과 같은 톤으로 맞춰 함께 써도 튀지 않는다 */
-  --color-aqua: #12a9bf;
-  --color-aqua-soft: #e0f6fa;
-  --color-mint: #2fa36b;
-  --color-mint-soft: #e5f6ed;
-  --color-amber: #d1892c;
-  --color-amber-soft: #fdf1df;
-  --color-coral: #dd6350;
-  --color-coral-soft: #fdebe7;
-  --color-violet: #7360e8;
-  --color-violet-soft: #efecfe;
-  --color-rose: #c9558c;
-  --color-rose-soft: #fceaf2;
+  /* 보조 액센트 — 예측·비교 시리즈 전용 */
+  --color-accent: #0f9fb3;
+  --color-accent-soft: #e1f4f7;
 
-  /* 텍스트 — 따뜻한 차콜 */
-  --color-ink: #23272e;
-  --color-ink-soft: #5f6570;
-  --color-ink-dim: #8f96a1;
+  /* 텍스트 */
+  --color-ink: #1f232a;
+  --color-ink-soft: #565d68;
+  --color-ink-dim: #858c97;
 
-  /* 상태 — 액센트와 동일 색상을 재사용 */
-  --color-positive: #2fa36b;
-  --color-positive-soft: #e5f6ed;
-  --color-warning: #d1892c;
-  --color-warning-soft: #fdf1df;
-  --color-negative: #dd6350;
-  --color-negative-soft: #fdebe7;
+  /* 상태 — 의미가 있을 때만 */
+  --color-positive: #1e9a61;
+  --color-positive-soft: #e3f4eb;
+  --color-warning: #c47d1c;
+  --color-warning-soft: #fbf0de;
+  --color-negative: #d44f3d;
+  --color-negative-soft: #fbe9e5;
 
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
     "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
 
-  --animate-fade-up: fade-up 0.45s ease-out both;
-  --animate-fade-in: fade-in 0.35s ease-out both;
+  /* ── 역할 기반 타입 스케일 ───────────────────────────────
+     caption 13 · meta 14 · sub 15 · body 16 · lead 17 · card 18
+     title 22 · page 28 · kpi 28 · display 40 (360px 기준) */
+  --text-caption: 13px;
+  --text-caption--line-height: 1.45;
+  --text-meta: 14px;
+  --text-meta--line-height: 1.5;
+  --text-sub: 15px;
+  --text-sub--line-height: 1.55;
+  --text-body: 16px;
+  --text-body--line-height: 1.6;
+  --text-lead: 17px;
+  --text-lead--line-height: 1.6;
+  --text-card: 18px;
+  --text-card--line-height: 1.4;
+  --text-title: 22px;
+  --text-title--line-height: 1.35;
+  --text-page: 28px;
+  --text-page--line-height: 1.25;
+  --text-kpi: 28px;
+  --text-kpi--line-height: 1.15;
+  --text-display: 40px;
+  --text-display--line-height: 1.2;
+
+  /* ── 모서리 3단계 ── */
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-panel: 20px;
+
+  /* ── 그림자 3단계 ── */
+  --shadow-subtle: 0 1px 2px rgba(24, 28, 36, 0.05);
+  --shadow-raised: 0 8px 24px -10px rgba(24, 28, 36, 0.18);
+  --shadow-overlay: 0 24px 56px -16px rgba(24, 28, 36, 0.28);
+
+  --animate-fade-up: fade-up 0.35s ease-out both;
+  --animate-fade-in: fade-in 0.25s ease-out both;
   --animate-shimmer: shimmer 1.6s linear infinite;
 
   @keyframes fade-up {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
   }
   @keyframes fade-in {
@@ -77,41 +103,49 @@ body {
   background-color: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  /* 한국어 어절 단위 줄바꿈 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 데스크톱에서는 페이지·KPI 제목만 한 단계 키운다 */
+@media (min-width: 768px) {
+  :root {
+    --text-page: 32px;
+    --text-kpi: 30px;
+    --text-title: 24px;
+    --text-display: 52px;
+  }
 }
 
 /* 얇은 커스텀 스크롤바 */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d5cdbd transparent;
+  scrollbar-color: #d4d0c6 transparent;
 }
 *::-webkit-scrollbar { width: 6px; height: 6px; }
-*::-webkit-scrollbar-thumb { background: #d5cdbd; border-radius: 3px; }
+*::-webkit-scrollbar-thumb { background: #d4d0c6; border-radius: 3px; }
 *::-webkit-scrollbar-track { background: transparent; }
 
-/* 카드 — 흰 배경 + 매우 얇은 테두리 + 거의 없는 그림자 */
+/* 패널 — 흰 표면 + 얇은 테두리. 패널 안에 패널을 넣지 않는다(카드 깊이 1). */
 .card {
   background: var(--color-surface);
   border: 1px solid var(--color-line);
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(60, 50, 35, 0.05);
-}
-.card-hover {
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
-}
-.card-hover:hover {
-  border-color: var(--color-line-strong);
-  box-shadow: 0 8px 24px rgba(60, 50, 35, 0.08);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-subtle);
 }
 
 /* Recharts 기본 스타일 정리 */
-.recharts-cartesian-axis-tick text { fill: #8f96a1; font-size: 16px; font-weight: 500; }
-.recharts-tooltip-cursor { stroke: #d9d1c1; }
+.recharts-cartesian-axis-tick text { fill: #858c97; font-size: 13px; font-weight: 500; }
+.recharts-tooltip-cursor { stroke: #d4d0c6; }
 .recharts-surface:focus, .recharts-wrapper:focus { outline: none; }
 
 .skeleton {
-  background: linear-gradient(90deg, #efeade 25%, #faf8f2 50%, #efeade 75%);
+  background: linear-gradient(90deg, #eeece6 25%, #f9f8f5 50%, #eeece6 75%);
   background-size: 400px 100%;
   animation: var(--animate-shimmer);
   border-radius: 8px;
@@ -180,7 +214,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
   .card {
     box-shadow: none !important;
-    border-color: #d7dfea !important;
+    border-color: #d4d0c6 !important;
     break-inside: avoid;
     page-break-inside: avoid;
   }
@@ -195,10 +229,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 /* ── 샘플 브릿지 CTA ─────────────────────────────────────────
    광고 배너처럼 보이지 않도록 아주 절제된 강조만 준다.          */
 .cta-surface {
-  background:
-    radial-gradient(120% 140% at 50% -20%, rgba(20, 120, 255, 0.09), transparent 62%),
-    linear-gradient(180deg, #ffffff 0%, #fbfaf6 100%);
-  box-shadow: 0 2px 20px rgba(60, 50, 35, 0.06);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-subtle);
 }
 
 /* 메인 CTA — 6.5초에 한 번, 약 2초 동안 지나가는 light sweep */

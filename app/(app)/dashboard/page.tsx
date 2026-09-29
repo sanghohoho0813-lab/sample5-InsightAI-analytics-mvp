@@ -1,149 +1,170 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, LineChart, Sparkles } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import MetricCard from "@/components/MetricCard";
-import RevenueTrendChart, { TrendMetric } from "@/components/charts/RevenueTrendChart";
+import PageSkeleton from "@/components/PageSkeleton";
+import FilterToolbar from "@/components/FilterToolbar";
+import KpiStrip from "@/components/KpiStrip";
+import AnomalyList from "@/components/AnomalyList";
+import { InsightList } from "@/components/InsightList";
+import DateLine from "@/components/DateLine";
+import { Panel, PanelHeader } from "@/components/Panel";
+import RevenueTrendChart from "@/components/charts/RevenueTrendChart";
 import ChannelDonut from "@/components/charts/ChannelDonut";
-import AnomalyCard from "@/components/AnomalyCard";
-import InsightCard from "@/components/InsightCard";
-import ForecastCard from "@/components/ForecastCard";
-import SectionHeader from "@/components/SectionHeader";
-import EmptyState from "@/components/EmptyState";
-import MobileHome from "@/components/MobileHome";
 import { useApp } from "@/lib/store";
-import { channelShares, computeKpis, filterDimensions, trendSeries } from "@/lib/analytics-engine";
-import { detectAnomalies } from "@/lib/anomaly-engine";
+import { channelShares, filterDimensions, trendSeries } from "@/lib/analytics-engine";
 import { computeForecasts } from "@/lib/forecast-engine";
-import { generateInsights } from "@/lib/insight-generator";
+import { reportSignature, scopeLabel, scopeOf, summarize } from "@/lib/report";
+import { formatDateKR, formatKRW } from "@/lib/format";
+import { MetricKey } from "@/lib/types";
+import { SEVERITY_META, btn } from "@/lib/ui";
 
 export default function DashboardPage() {
-  const { dataset, filters, seedDemoDataset } = useApp();
-  const [metric, setMetric] = useState<TrendMetric>("revenue");
-
-  // 루트 도메인이 대시보드로 연결되므로, 첫 방문에도 화면이 비어 있지 않게 한다.
-  useEffect(() => {
-    if (!dataset) seedDemoDataset();
-  }, [dataset, seedDemoDataset]);
+  const { dataset, filters, reports, saveReport, setFilters } = useApp();
+  const [metric, setMetric] = useState<MetricKey>("revenue");
 
   const data = useMemo(() => {
     if (!dataset) return null;
+    const forecast = computeForecasts(filterDimensions(dataset.rows, filters))[0];
     return {
-      kpis: computeKpis(dataset.rows, filters),
+      summary: summarize(dataset, filters),
+      scope: scopeOf(dataset, filters),
       trend: trendSeries(dataset.rows, filters),
-      shares: channelShares(dataset.rows, filters),
-      anomalies: detectAnomalies(dataset.rows, filters),
-      insights: generateInsights({ rows: dataset.rows, filters }),
-      forecasts: computeForecasts(filterDimensions(dataset.rows, filters)),
+      shares: channelShares(dataset.rows, { ...filters, channel: "all" }),
+      forecast,
+      signature: reportSignature(dataset, filters),
     };
   }, [dataset, filters]);
 
-  if (!dataset || !data) {
-    return (
-      <>
-        <PageHeader subtitle="데이터를 연결하면 AI 분석이 시작됩니다" />
-        <EmptyState />
-      </>
-    );
-  }
+  if (!dataset || !data) return <PageSkeleton />;
+
+  const { summary, scope } = data;
+  const saved = reports.find((r) => r.signature === data.signature);
 
   return (
     <>
-      {/* 모바일 — 오늘의 비즈니스 요약 */}
-      <MobileHome
-        dataset={dataset}
-        kpis={data.kpis}
-        insights={data.insights}
-        anomalies={data.anomalies}
-        forecasts={data.forecasts}
+      <PageHeader
+        eyebrow={<DateLine className="text-meta text-ink-dim lg:hidden" showTime={false} />}
+        title="대시보드"
+        description={`${dataset.name} · ${scope.days}일 범위를 이전 같은 기간과 비교합니다.`}
+        actions={
+          saved ? (
+            <Link href={`/reports?id=${saved.id}`} className={btn.secondary}>
+              저장된 보고서 보기
+            </Link>
+          ) : (
+            <button onClick={() => saveReport()} className={btn.primary}>
+              이 범위를 보고서로 저장
+            </button>
+          )
+        }
       />
 
-      {/* 데스크톱 — 고밀도 분석 대시보드 */}
-      <div className="hidden lg:block">
-        <PageHeader subtitle={`${dataset.name} · AI가 최근 ${filters.rangeDays}일을 분석했습니다`} />
+      <FilterToolbar dataset={dataset} />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-          {data.kpis.map((kpi, i) => (
-            <MetricCard
-              key={kpi.key}
-              kpi={kpi}
-              delay={i * 60}
-              selected={metric === kpi.key}
-              onSelect={() => setMetric(kpi.key as TrendMetric)}
-            />
-          ))}
-          {/* 3열 배치에서 남는 칸을 AI 한 줄 요약으로 채운다 (5열에서는 숨김) */}
-          {data.insights[0] && (
-            <Link
-              href="/insights"
-              className="card card-hover animate-fade-up flex flex-col justify-center gap-2 bg-brand-soft/60 p-5 2xl:hidden"
-              style={{ animationDelay: "300ms" }}
-            >
-              <span className="flex items-center gap-2 text-[17px] font-bold text-brand">
-                <Sparkles className="h-6 w-6" />
-                AI 한 줄 요약
-              </span>
-              <span className="text-[19px] font-semibold leading-relaxed text-ink">
-                {data.insights[0].description}
-              </span>
-              <span className="flex items-center gap-1 text-[16px] font-semibold text-brand">
-                인사이트 전체 보기 <ArrowRight className="h-5 w-5" />
-              </span>
-            </Link>
-          )}
-        </div>
+      {/* 1. 답 — 무엇이 변했나 → 왜 → 다음 행동 */}
+      <Panel className="p-5 md:p-6" aria-labelledby="summary-title">
+        <p className="text-meta text-ink-dim">{scopeLabel(scope)}</p>
+        <h2 id="summary-title" className="mt-2 text-title font-bold tracking-tight text-ink">
+          {summary.headline}
+        </h2>
+        <dl className="mt-5 grid gap-5 border-t border-line pt-5 md:grid-cols-3 md:gap-8">
+          <div>
+            <dt className="text-caption font-semibold text-ink-dim">왜 변했나</dt>
+            <dd className="mt-1 text-body font-semibold text-ink">{summary.why?.title ?? "뚜렷한 요인 없음"}</dd>
+            {summary.why && <dd className="mt-1 text-sub text-ink-soft">{summary.why.description}</dd>}
+          </div>
+          <div>
+            <dt className="text-caption font-semibold text-ink-dim">확인이 필요한 변화</dt>
+            {summary.alert ? (
+              <>
+                <dd className="mt-1 text-body font-semibold text-ink">
+                  <span className={SEVERITY_META[summary.alert.severity].text}>
+                    [{SEVERITY_META[summary.alert.severity].label}]
+                  </span>{" "}
+                  {summary.alert.title}
+                </dd>
+                <dd className="mt-1 text-sub text-ink-soft">
+                  {formatDateKR(summary.alert.date)} · {summary.alert.description}
+                </dd>
+              </>
+            ) : (
+              <dd className="mt-1 text-sub text-ink-soft">이 범위에서는 주의가 필요한 변화가 없습니다.</dd>
+            )}
+          </div>
+          <div>
+            <dt className="text-caption font-semibold text-ink-dim">다음 행동</dt>
+            <dd className="mt-1 text-body font-semibold text-ink">{summary.next?.title ?? "–"}</dd>
+            {summary.next && <dd className="mt-1 text-sub text-ink-soft">{summary.next.description}</dd>}
+          </div>
+        </dl>
+      </Panel>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 2xl:grid-cols-[1.6fr_1fr]">
+      {/* 2. 핵심 지표 — 누르면 아래 추이 차트의 지표가 바뀐다 */}
+      <div className="mt-6">
+        <KpiStrip kpis={summary.kpis} selected={metric} onSelect={setMetric} />
+      </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        <div className="min-w-0 xl:col-span-2">
           <RevenueTrendChart points={data.trend} metric={metric} />
-          <ChannelDonut shares={data.shares} />
         </div>
+        <Panel>
+          <PanelHeader
+            title="확인이 필요한 변화"
+            description="규칙: 전일 대비 ±30% 또는 7일 평균 대비 ±2σ"
+            action={
+              <Link href="/anomalies" className={btn.quiet}>
+                전체 {summary.anomalies.length}건
+              </Link>
+            }
+          />
+          <div className="mt-2">
+            <AnomalyList anomalies={summary.anomalies.slice(0, 4)} />
+          </div>
+        </Panel>
+      </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <section>
-            <SectionHeader
-              title="이상 징후 감지"
-              href="/anomalies"
-              icon={<AlertTriangle className="h-6 w-6 text-warning" />}
-            />
-            <div className="space-y-2.5">
-              {data.anomalies.length === 0 ? (
-                <div className="card p-5 text-center text-[19px] text-ink-dim">
-                  이 기간에는 특이한 변화가 감지되지 않았습니다.
-                </div>
-              ) : (
-                data.anomalies.slice(0, 3).map((a, i) => <AnomalyCard key={a.id} anomaly={a} delay={i * 70} />)
-              )}
-            </div>
-          </section>
+      <div className="mt-6 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <Panel>
+          <PanelHeader title="채널별 매출 비중" description="채널을 누르면 그 채널만 봅니다" />
+          <ChannelDonut shares={data.shares} active={filters.channel} onSelect={(ch) => setFilters({ channel: ch })} />
+        </Panel>
 
-          <section>
-            <SectionHeader
-              title="예측"
-              href="/forecast"
-              icon={<LineChart className="h-6 w-6 text-brand" />}
-            />
-            <div className="space-y-2.5">
-              {data.forecasts.map((f, i) => (
-                <ForecastCard key={f.key} summary={f} delay={i * 70} />
-              ))}
-            </div>
-          </section>
+        <Panel className="xl:col-span-1">
+          <PanelHeader
+            title="주요 인사이트"
+            action={
+              <Link href="/insights" className={btn.quiet}>
+                모두 보기
+              </Link>
+            }
+          />
+          <div className="mt-2">
+            <InsightList insights={summary.insights.slice(0, 2)} compact />
+          </div>
+        </Panel>
 
-          <section>
-            <SectionHeader
-              title="AI 인사이트"
-              href="/insights"
-              icon={<Sparkles className="h-6 w-6 text-brand" />}
-            />
-            <div className="space-y-2.5">
-              {data.insights.slice(0, 3).map((ins, i) => (
-                <InsightCard key={ins.id} insight={ins} delay={i * 70} />
-              ))}
-            </div>
-          </section>
-        </div>
+        {data.forecast && (
+          <Panel className="flex flex-col p-5 md:p-6 lg:col-span-2 xl:col-span-1">
+            <h2 className="text-card font-bold text-ink">다음 7일 매출 예측</h2>
+            <p className="mt-1 text-meta text-ink-dim">최근 14일 추세 기반 단순 모델 · 데모</p>
+            <p className="tabular mt-4 text-kpi font-bold tracking-tight text-ink">
+              {formatKRW(data.forecast.next7Total)}
+            </p>
+            <p className="mt-1 text-meta text-ink-soft">
+              직전 7일보다{" "}
+              <b className={`font-semibold ${data.forecast.changePct >= 0 ? "text-positive" : "text-negative"}`}>
+                {data.forecast.changePct >= 0 ? "+" : ""}
+                {data.forecast.changePct.toFixed(1)}%
+              </b>
+            </p>
+            <Link href="/forecast" className={`${btn.quiet} mt-auto pt-4`}>
+              예측 자세히 보기 →
+            </Link>
+          </Panel>
+        )}
       </div>
     </>
   );

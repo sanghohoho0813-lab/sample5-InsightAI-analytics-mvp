@@ -2,165 +2,79 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  AlertTriangle,
-  BarChart3,
-  Bell,
-  Bot,
-  CircleHelp,
-  Compass,
-  Database,
-  FileText,
-  LayoutDashboard,
-  LineChart,
-  Settings,
-  Sparkles,
-} from "lucide-react";
-import { MiraeWordmark } from "./MiraeLogo";
+import { useMemo } from "react";
+import { MiraeSymbol } from "./MiraeLogo";
+import Logo from "./Logo";
 import { BRAND } from "@/lib/brand";
-import { HUES, HueName } from "@/lib/palette";
+import { NavItem, PRIMARY_NAV, WORKSPACE_NAV, isActive } from "@/lib/nav";
+import { unreadAlertCount } from "@/lib/notifications";
 import { useApp } from "@/lib/store";
 
-interface NavItem {
-  href: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  hue: HueName;
+function NavLink({ item, active, count }: { item: NavItem; active: boolean; count?: number }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      className={`relative flex min-h-11 items-center gap-3 rounded-control px-3 text-sub transition-colors ${
+        active ? "bg-nav-soft font-semibold text-white" : "font-medium text-nav-text hover:bg-nav-soft/60 hover:text-white"
+      }`}
+    >
+      {active && <span className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-brand-light" aria-hidden />}
+      <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-brand-light" : "text-nav-dim"}`} strokeWidth={2} aria-hidden />
+      <span className="flex-1">{item.label}</span>
+      {count != null && count > 0 && (
+        <span className="tabular rounded-full bg-white/10 px-2 text-caption font-semibold text-white" aria-label={`미확인 ${count}건`}>
+          {count}
+        </span>
+      )}
+    </Link>
+  );
 }
 
-/** 섹션으로 묶은 내비게이션 — 항목마다 고유 색상 칩을 갖는다. */
-export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
-  {
-    title: "OVERVIEW",
-    items: [
-      { href: "/dashboard", label: "홈 대시보드", icon: LayoutDashboard, hue: "blue" },
-      { href: "/insights", label: "AI 인사이트", icon: Sparkles, hue: "amber" },
-    ],
-  },
-  {
-    title: "ANALYTICS",
-    items: [
-      { href: "/analytics", label: "분석", icon: BarChart3, hue: "violet" },
-      { href: "/explore", label: "데이터 탐색", icon: Compass, hue: "cyan" },
-      { href: "/forecast", label: "예측", icon: LineChart, hue: "mint" },
-    ],
-  },
-  {
-    title: "MONITORING",
-    items: [
-      { href: "/anomalies", label: "이상 감지", icon: AlertTriangle, hue: "coral" },
-      { href: "/notifications", label: "알림", icon: Bell, hue: "rose" },
-    ],
-  },
-  {
-    title: "WORKSPACE",
-    items: [
-      { href: "/ai", label: "AI 질의", icon: Bot, hue: "blue" },
-      { href: "/reports", label: "보고서", icon: FileText, hue: "amber" },
-      { href: "/data", label: "데이터 관리", icon: Database, hue: "cyan" },
-      { href: "/settings", label: "설정", icon: Settings, hue: "slate" },
-    ],
-  },
-];
-
-/** 모바일 '더보기' 등에서 쓰는 평면 목록 */
-export const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((s) => s.items);
-
+/** 데스크톱 내비게이션 — 핵심 6개 + 작업 공간 3개. 아이콘은 단색, 활성 항목만 브랜드색. */
 export default function Sidebar() {
   const pathname = usePathname();
-  const { dataset, showToast } = useApp();
+  const { dataset, readIds } = useApp();
+  const unread = useMemo(() => unreadAlertCount(dataset, readIds), [dataset, readIds]);
+  const counts: Record<string, number | undefined> = { "/anomalies": unread };
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[292px] flex-col bg-nav lg:flex">
-      <Link href="/dashboard" className="block px-5 pb-3.5 pt-4">
-        <span className="block text-[24px] font-extrabold leading-tight tracking-tight text-white">
-          Insight<span className="text-brand-light">AI</span>
-        </span>
-        <span className="mt-1 block whitespace-nowrap text-[13px] font-bold tracking-[0.1em] text-amber">
-          AI ANALYTICS INTELLIGENCE
-        </span>
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] flex-col bg-nav lg:flex">
+      <Link href="/dashboard" className="flex h-16 items-center px-5" aria-label={`${BRAND.product} 대시보드`}>
+        <Logo size={26} tone="light" />
       </Link>
 
-      <nav className="relative flex-1 overflow-y-auto px-3 pb-2 [mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)]">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.title} className="mb-3.5 last:mb-1">
-            <p className="mb-1.5 px-3 text-[12.5px] font-bold tracking-[0.16em] text-nav-dim">
-              {section.title}
-            </p>
-            <div className="space-y-0.5">
-              {section.items.map(({ href, label, icon: Icon, hue }) => {
-                const active = pathname === href;
-                const c = HUES[hue];
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    aria-current={active ? "page" : undefined}
-                    className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[17px] transition-colors duration-200 ${
-                      active
-                        ? "bg-nav-soft font-bold text-white"
-                        : "font-medium text-nav-text hover:bg-nav-soft/60 hover:text-white"
-                    }`}
-                  >
-                    <span
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px]"
-                      style={{ backgroundColor: `${c.base}26`, color: c.light }}
-                    >
-                      <Icon className="h-5 w-5" strokeWidth={active ? 2.3 : 1.9} />
-                    </span>
-                    {label}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        <button
-          onClick={() => showToast("도움말 센터는 정식 버전에서 제공됩니다.", "info")}
-          className="mb-2 flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[17px] font-medium text-nav-text transition-colors hover:bg-nav-soft/60 hover:text-white"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-white/10 text-nav-dim">
-            <CircleHelp className="h-5 w-5" strokeWidth={1.9} />
-          </span>
-          도움말 및 지원
-        </button>
+      <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="주요 메뉴">
+        <div className="space-y-1">
+          {PRIMARY_NAV.map((item) => (
+            <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} count={counts[item.href]} />
+          ))}
+        </div>
+        <p className="mb-2 mt-6 px-3 text-caption font-semibold text-nav-dim">작업 공간</p>
+        <div className="space-y-1">
+          {WORKSPACE_NAV.map((item) => (
+            <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+          ))}
+        </div>
       </nav>
 
-      <div className="space-y-2.5 border-t border-nav-line p-3.5">
-        <div className="rounded-xl bg-nav-soft p-3.5">
-          <div className="flex items-center justify-between text-[16px] font-bold text-white">
-            <span>Pro 플랜</span>
-            <span className="rounded-md bg-mint/20 px-2 py-0.5 text-[13px] font-semibold text-mint-soft">
-              활성
-            </span>
-          </div>
-          <div className="mt-2.5 flex items-center justify-between text-[14px] text-nav-dim">
-            <span>데이터 사용량</span>
-            <span className="font-bold text-nav-text">78%</span>
-          </div>
-          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full w-[78%] rounded-full bg-gradient-to-r from-brand to-aqua" />
-          </div>
-          <p className="mt-1.5 text-[13px] text-nav-dim">결제일 매월 15일</p>
-        </div>
-
-        <div className="flex items-center gap-3 border-t border-nav-line px-1 pt-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand/20 text-[17px] font-bold text-brand-light">
-            {BRAND.user.initial}
+      <div className="border-t border-nav-line px-5 py-4">
+        <p className="text-caption text-nav-dim">분석 중인 데이터</p>
+        <Link href="/data" className="mt-1 block truncate text-sub font-semibold text-white hover:underline">
+          {dataset?.name ?? "데이터 선택"}
+        </Link>
+        <a
+          href={BRAND.links.home}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 flex items-center gap-2 text-caption text-nav-dim transition-colors hover:text-nav-text"
+        >
+          <span className="rounded bg-white px-1 py-0.5">
+            <MiraeSymbol height={14} />
           </span>
-          <div className="min-w-0">
-            <p className="truncate text-[18px] font-bold text-white">{BRAND.user.name}님</p>
-            <p className="truncate text-[14px] text-nav-dim">
-              {dataset ? dataset.name : "데이터 미연결"}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 border-t border-nav-line pt-3">
-          <span className="shrink-0 text-[12.5px] font-bold tracking-[0.16em] text-nav-dim">BUILT BY</span>
-          <MiraeWordmark height={34} variant="light" />
-        </div>
+          {BRAND.company} 제작 샘플
+        </a>
       </div>
     </aside>
   );
