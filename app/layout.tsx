@@ -3,6 +3,7 @@ import "./globals.css";
 import { AppProvider } from "@/lib/store";
 import ToastStack from "@/components/ToastStack";
 import AnalysisOverlay from "@/components/AnalysisOverlay";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "InsightAI — 미래에이아이랩 AI 데이터 분석·예측 SaaS",
@@ -24,6 +25,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body>
+        {/* 미래AI랩 데모 공용 뒤로·앞으로 버튼 */}
+        <Script src="/mirae-history-nav.js" strategy="beforeInteractive" />
         <AppProvider>
           {children}
           <AnalysisOverlay />
