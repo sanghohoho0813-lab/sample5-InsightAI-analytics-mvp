@@ -3,7 +3,8 @@ import { formatKRW, formatKRWExact } from "./format";
 import { computeForecasts, FORECAST_MIN_DAYS } from "./forecast-engine";
 import { DataRow, DerivedField, Filters, Insight, Recommendation } from "./types";
 
-export const DEFAULT_FILTERS: Filters = {
+/** 데이터 질의 기준 범위 — 전체 채널·최근 30일 */
+const QA_FILTERS: Filters = {
   preset: "30",
   rangeDays: 30,
   channel: "all",
@@ -206,7 +207,7 @@ export function generateRecommendations(ctx: Context): Recommendation[] {
 /** 자연어 질의 데모 엔진: 질문 키워드를 해석해 실제 데이터를 계산해 답한다. */
 export function answerDataQuestion(question: string, rows: DataRow[], derived: DerivedField[] = []): string {
   const q = question.toLowerCase();
-  const filters = DEFAULT_FILTERS;
+  const filters = QA_FILTERS;
   const shares = channelShares(rows, filters);
   const { current, previous, currentDates } = applyFilters(rows, filters);
   const comparable = isComparable(rows, filters);

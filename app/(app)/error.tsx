@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { btn } from "@/lib/ui";
+import { clearAll } from "@/lib/persist";
 
 /** 화면을 그리다 오류가 나면 앱 전체가 멈추지 않도록 이 영역만 대신 보여준다. */
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
@@ -11,15 +12,10 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
 
   // 브라우저에 저장된 데이터가 손상된 경우를 위한 마지막 수단
   const clearAndReload = () => {
-    try {
-      Object.keys(localStorage)
-        .filter((k) => k.startsWith("insightai."))
-        .forEach((k) => localStorage.removeItem(k));
-    } catch {
-      // 저장소 접근 불가 시 새로고침만
-    }
+    clearAll();
     window.location.assign("/dashboard");
   };
+
 
   return (
     <div className="card mx-auto mt-6 max-w-lg px-6 py-12 text-center" role="alert">

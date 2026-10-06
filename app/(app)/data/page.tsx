@@ -7,7 +7,8 @@ import PageSkeleton from "@/components/PageSkeleton";
 import UploadPanel from "@/components/UploadPanel";
 import DataTable from "@/components/DataTable";
 import { Panel, PanelHeader } from "@/components/Panel";
-import { findDataset, useApp } from "@/lib/store";
+import { useApp } from "@/lib/store";
+import { findDataset } from "@/lib/persist";
 import { getDemoDatasets } from "@/lib/demo-data";
 import { btn } from "@/lib/ui";
 

@@ -25,9 +25,10 @@ export default function ChannelDonut({
   return (
     <div className="@container px-5 pb-5 pt-4 md:px-6">
     <div className="flex flex-col items-center gap-4 @[440px]:flex-row">
-      <div className="relative h-[168px] w-[168px] shrink-0">
+      {/* 같은 값이 옆 목록에 글자로 있으므로 그림은 보조 기술에서 숨긴다 */}
+      <div className="relative h-[168px] w-[168px] shrink-0" aria-hidden>
         <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
+          <PieChart accessibilityLayer={false}>
             <Tooltip
               content={({ active: on, payload }) => {
                 if (!on || !payload?.length) return null;
@@ -43,6 +44,7 @@ export default function ChannelDonut({
               data={shares}
               dataKey="revenue"
               nameKey="channel"
+              rootTabIndex={-1}
               innerRadius={56}
               outerRadius={80}
               paddingAngle={1.5}

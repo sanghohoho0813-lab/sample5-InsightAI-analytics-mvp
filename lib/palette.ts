@@ -8,11 +8,11 @@ export const COLORS = {
   compare: "#9dbcf0", // 이전 기간 비교선
   accent: "#0f9fb3", // 예측 시리즈
   grid: "#ebe8e1",
-  positive: "#1e9a61",
-  warning: "#c47d1c",
-  negative: "#d44f3d",
+  positive: "#147a49",
+  warning: "#965b0d",
+  negative: "#bf3b2b",
   ink: "#1f232a",
-  dim: "#858c97",
+  dim: "#646b76",
 } as const;
 
 /** 범주형 시리즈 — 명도 단계로 구분하고, 상위 2개만 채도를 준다. */

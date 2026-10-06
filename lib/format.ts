@@ -20,7 +20,7 @@ export function formatNumber(value: number): string {
   return Math.round(value).toLocaleString("ko-KR");
 }
 
-export function formatPercent(value: number, digits = 2): string {
+function formatPercent(value: number, digits = 2): string {
   return `${value.toFixed(digits)}%`;
 }
 

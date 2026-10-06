@@ -33,6 +33,9 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
+/** 헤더 비교용 정규화 — 대소문자·공백·밑줄·하이픈·BOM 차이를 무시한다 */
+const normalizeHeader = (h: string) => h.replace(/\uFEFF/g, "").toLowerCase().replace(/[\s_-]/g, "");
+
 const HEADER_ALIASES: Record<keyof Omit<DataRow, "aov" | "conversionRate"> | "aov" | "conversionRate", string[]> = {
   date: ["date", "날짜", "일자", "day"],
   channel: ["channel", "채널"],
@@ -48,14 +51,14 @@ const HEADER_ALIASES: Record<keyof Omit<DataRow, "aov" | "conversionRate"> | "ao
   adSpend: ["adspend", "ad_spend", "광고비", "adcost"],
 };
 
-export const REQUIRED_COLUMNS = ["Date", "Revenue", "Orders"];
-export const SUPPORTED_COLUMNS = [
-  "Date", "Revenue", "Orders", "Visitors", "Customers", "NewCustomers",
-  "ReturningCustomers", "ConversionRate", "AOV", "Channel", "Product", "AdSpend",
-];
 
 function normalizeDate(v: string): string | null {
-  const s = v.trim().replace(/[./]/g, "-");
+  // 2026.09.01 · 2026/9/1 · 2026년 9월 1일 → 2026-09-01
+  const s = v
+    .trim()
+    .replace(/\s*(년|월)\s*/g, "-")
+    .replace(/\s*일$/, "")
+    .replace(/[./]/g, "-");
   const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (!m) return null;
   return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
@@ -84,10 +87,10 @@ export function toDataRows(table: string[][]): ParseResult {
     return { rows: [], columns: [], rowCount: 0, error: "데이터 행이 없습니다. 헤더와 1개 이상의 행이 필요합니다." };
   }
   const header = table[0].map((h) => h.trim());
-  const norm = header.map((h) => h.toLowerCase().replace(/[\s_-]/g, ""));
+  const norm = header.map(normalizeHeader);
   const idx: Partial<Record<keyof DataRow, number>> = {};
   (Object.keys(HEADER_ALIASES) as (keyof DataRow)[]).forEach((key) => {
-    const found = norm.findIndex((h) => HEADER_ALIASES[key].includes(h));
+    const found = norm.findIndex((h) => HEADER_ALIASES[key].some((alias) => normalizeHeader(alias) === h));
     if (found >= 0) idx[key] = found;
   });
 
@@ -137,6 +140,25 @@ export function toDataRows(table: string[][]): ParseResult {
   return { rows, columns: header, rowCount: rows.length, derived, skipped };
 }
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * 엑셀 첫 시트를 문자열 표로 바꾼다.
+ * 날짜 셀은 표시 형식(예: 9/1/26)이 아니라 실제 날짜 값으로 읽어 YYYY-MM-DD로 맞춘다.
+ */
+export async function sheetToTable(buf: ArrayBuffer): Promise<string[][]> {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  if (!sheet) return [];
+  const raw = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: "" });
+  return raw.map((r) =>
+    (r ?? []).map((c) =>
+      c instanceof Date ? `${c.getFullYear()}-${pad(c.getMonth() + 1)}-${pad(c.getDate())}` : String(c ?? "")
+    )
+  );
+}
+
 export async function parseFile(file: File): Promise<ParseResult> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".csv")) {
@@ -144,12 +166,7 @@ export async function parseFile(file: File): Promise<ParseResult> {
     return toDataRows(parseCsv(text));
   }
   if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
-    const XLSX = await import("xlsx");
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: "array" });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const table = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false }) as string[][];
-    return toDataRows(table.map((r) => (r ?? []).map((c) => String(c ?? ""))));
+    return toDataRows(await sheetToTable(await file.arrayBuffer()));
   }
   return { rows: [], columns: [], rowCount: 0, error: "CSV 또는 XLSX 파일만 업로드할 수 있습니다." };
 }

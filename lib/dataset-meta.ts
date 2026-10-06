@@ -7,7 +7,7 @@ import { DemoDataset, DerivedField, Filters, KpiResult } from "./types";
  */
 const has = (ds: DemoDataset | null | undefined, f: DerivedField) => !ds?.derived?.includes(f);
 
-export function kpiAvailable(key: string, ds: DemoDataset | null | undefined): boolean {
+function kpiAvailable(key: string, ds: DemoDataset | null | undefined): boolean {
   switch (key) {
     case "orders":
     case "aov":
@@ -26,7 +26,7 @@ export function availableKpis(kpis: KpiResult[], ds: DemoDataset | null | undefi
 }
 
 /** 이상치 탐지에서 뺄 지표 (anomaly-engine의 지표 키) */
-export function anomalyExclusions(ds: DemoDataset | null | undefined) {
+function anomalyExclusions(ds: DemoDataset | null | undefined) {
   const out: ("visitors" | "orders" | "conversionRate" | "aov")[] = [];
   if (!has(ds, "visitors")) out.push("visitors", "conversionRate");
   if (!has(ds, "orders")) out.push("orders", "aov", "conversionRate");

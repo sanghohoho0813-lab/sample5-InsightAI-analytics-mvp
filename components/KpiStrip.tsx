@@ -3,7 +3,7 @@
 import { KpiResult, MetricKey } from "@/lib/types";
 import { formatValue } from "@/lib/format";
 
-export function KpiDelta({ kpi, className = "" }: { kpi: KpiResult; className?: string }) {
+function KpiDelta({ kpi, className = "" }: { kpi: KpiResult; className?: string }) {
   if (kpi.comparable === false) return <span className={`text-ink-dim ${className}`}>비교 없음</span>;
   const up = kpi.changePct >= 0;
   const good = kpi.invert ? !up : up;

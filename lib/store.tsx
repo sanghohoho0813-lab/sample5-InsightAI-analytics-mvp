@@ -2,7 +2,20 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getDemoDataset, getDemoDatasets } from "./demo-data";
+import { getDemoDatasets } from "./demo-data";
+import {
+  KEYS,
+  clearAll,
+  findDataset,
+  isValidRecord,
+  isValidReport,
+  readJson,
+  readList,
+  readUploads,
+  sameFile,
+  storeUpload,
+  writeJson,
+} from "./persist";
 import { buildReport, keyFinding } from "./report";
 import { AnalysisRecord, AppSettings, DemoDataset, Filters, SavedReport } from "./types";
 
@@ -69,18 +82,6 @@ export const ANALYSIS_STEPS = [
   "이상치 탐지 · 인사이트 정리",
 ];
 
-/** 모든 저장 키는 이 접두어를 쓴다 — 데모 초기화 시 한 번에 지운다. */
-const PREFIX = "insightai.";
-const KEYS = {
-  history: `${PREFIX}history`,
-  active: `${PREFIX}activeDataset`,
-  read: `${PREFIX}readNotifications`,
-  reports: `${PREFIX}reports`,
-  settings: `${PREFIX}settings`,
-  uploads: `${PREFIX}uploads`,
-};
-
-const MAX_UPLOADS = 3;
 const DEFAULT_SETTINGS: AppSettings = { defaultPreset: "30" };
 
 const filtersFor = (preset: AppSettings["defaultPreset"]): Filters => ({
@@ -89,54 +90,6 @@ const filtersFor = (preset: AppSettings["defaultPreset"]): Filters => ({
   channel: "all",
   product: "all",
 });
-
-function readJson<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-/** 저장된 목록에서 형태가 맞지 않는 항목(손상·구버전)은 버린다. */
-function readList<T>(key: string, valid: (x: T) => boolean): T[] {
-  const raw = readJson<unknown>(key, []);
-  return Array.isArray(raw) ? (raw as T[]).filter((x) => x != null && valid(x)) : [];
-}
-const validReport = (r: SavedReport) =>
-  typeof r.id === "string" && typeof r.title === "string" && !!r.scope?.start && Array.isArray(r.kpis) &&
-  Array.isArray(r.findings) && Array.isArray(r.anomalies) && Array.isArray(r.recommendations) && Array.isArray(r.forecasts);
-const validRecord = (h: AnalysisRecord) => typeof h.id === "string" && typeof h.datasetId === "string" && typeof h.createdAt === "string";
-const validUpload = (d: DemoDataset) =>
-  typeof d.id === "string" && Array.isArray(d.rows) && d.rows.length > 0 && Array.isArray(d.channels) && Array.isArray(d.products);
-const readUploads = () => readList<DemoDataset>(KEYS.uploads, validUpload);
-
-function writeJson(key: string, value: unknown): boolean {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** 업로드 원본 보관 — 최근 3개까지, 용량 초과 시 오래된 것부터 비운다. */
-function storeUpload(ds: DemoDataset): boolean {
-  // 같은 파일을 다시 올리면(이름·행 수 동일) 예전 사본을 대체한다.
-  let list = readUploads().filter((d) => d.id !== ds.id && !(d.name === ds.name && d.rows.length === ds.rows.length));
-  list = [ds, ...list].slice(0, MAX_UPLOADS);
-  while (list.length > 0) {
-    if (writeJson(KEYS.uploads, list)) return list.some((d) => d.id === ds.id);
-    list = list.slice(0, -1);
-  }
-  return false;
-}
-
-export function findDataset(id: string): DemoDataset | null {
-  if (id.startsWith("demo-")) return getDemoDataset(id) ?? null;
-  return readUploads().find((d) => d.id === id) ?? null;
-}
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -159,8 +112,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const s = { ...DEFAULT_SETTINGS, ...readJson<Partial<AppSettings>>(KEYS.settings, {}) };
     setSettings(s);
     setFiltersState(filtersFor(s.defaultPreset));
-    setHistory(readList<AnalysisRecord>(KEYS.history, validRecord));
-    setReports(readList<SavedReport>(KEYS.reports, validReport));
+    setHistory(readList<AnalysisRecord>(KEYS.history, isValidRecord));
+    setReports(readList<SavedReport>(KEYS.reports, isValidReport));
     setReadIds(readList<string>(KEYS.read, (x) => typeof x === "string"));
     setUploads(readUploads());
     const active = readJson<{ id?: string } | null>(KEYS.active, null);
@@ -226,7 +179,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const isUpload = !input.id.startsWith("demo-");
           // 같은 파일을 다시 올렸으면 예전 id를 이어 써서 이전 분석 기록도 계속 열리게 한다.
           const same = isUpload
-            ? readUploads().find((d) => d.name === input.name && d.rows.length === input.rows.length)
+            ? readUploads().find((d) => sameFile(d, input))
             : undefined;
           const ds = same ? { ...input, id: same.id } : input;
           const restorable = isUpload ? storeUpload(ds) : true;
@@ -366,13 +319,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const resetDemo = useCallback(() => {
-    try {
-      Object.keys(localStorage)
-        .filter((k) => k.startsWith(PREFIX))
-        .forEach((k) => localStorage.removeItem(k));
-    } catch {
-      // 저장소 접근 불가 환경 무시
-    }
+    clearAll();
     setSettings(DEFAULT_SETTINGS);
     setFiltersState(filtersFor(DEFAULT_SETTINGS.defaultPreset));
     setHistory([]);

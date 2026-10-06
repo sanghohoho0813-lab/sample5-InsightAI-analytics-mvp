@@ -6,12 +6,18 @@ import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import EmptyState from "@/components/EmptyState";
 import { useApp } from "@/lib/store";
-import { askDataQuestion } from "@/lib/ai";
+import { askDataQuestion } from "@/lib/ai/client";
+import { QUESTION_MAX } from "@/lib/ai/contract";
+import { Filters } from "@/lib/types";
 import { SUGGESTED_QUESTIONS } from "@/lib/insight-generator";
 import { btn, field } from "@/lib/ui";
 
+const QA_SCOPE: Filters = { preset: "30", rangeDays: 30, channel: "all", product: "all" };
+
 interface Message {
   role: "user" | "ai";
+  /** AI 답변을 누가 만들었는지(LLM 또는 규칙 기반) */
+  source?: "llm" | "rules";
   text: string;
 }
 
@@ -61,8 +67,9 @@ export default function AiQueryPage() {
     setInput("");
     setMessages((m) => [...m, { role: "user", text: q }]);
     setThinking(true);
-    const answer = await askDataQuestion(q, dataset.rows, dataset.derived);
-    setMessages((m) => [...m, { role: "ai", text: answer }]);
+    // 규칙 기반·LLM 모두 같은 기준(전체 채널·최근 30일)으로 답해 숫자가 어긋나지 않게 한다.
+    const answer = await askDataQuestion(q, dataset, QA_SCOPE);
+    setMessages((m) => [...m, { role: "ai", text: answer.text, source: answer.source }]);
     setThinking(false);
   };
 
@@ -105,7 +112,9 @@ export default function AiQueryPage() {
               </div>
             ) : (
               <div key={i} className="max-w-[92%]">
-                <p className="text-caption font-semibold text-ink-dim">InsightAI · 규칙 기반 답변</p>
+                <p className="text-caption font-semibold text-ink-dim">
+                  InsightAI · {m.source === "llm" ? "AI 답변(계산된 데이터 근거)" : "규칙 기반 답변"}
+                </p>
                 <p className="mt-1 rounded-card rounded-tl-[4px] bg-surface-soft px-4 py-3 text-body text-ink">{m.text}</p>
               </div>
             )
@@ -148,7 +157,7 @@ export default function AiQueryPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="예: 광고 효율이 가장 높은 채널은?"
-              maxLength={200}
+              maxLength={QUESTION_MAX}
               autoComplete="off"
               className={`${field} h-12 flex-1`}
             />

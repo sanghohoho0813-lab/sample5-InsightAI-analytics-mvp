@@ -25,10 +25,9 @@ const UNITS: { value: Unit; label: string }[] = [
   { value: "month", label: "월간" },
 ];
 
-export type TrendMetric = MetricKey;
 
 const METRIC_META: Record<
-  TrendMetric,
+  MetricKey,
   { key: keyof DailyPoint; label: string; full: (v: number) => string; axis: (v: number) => string }
 > = {
   revenue: {
@@ -58,7 +57,7 @@ export default function RevenueTrendChart({
   markDate,
 }: {
   points: DailyPoint[];
-  metric?: TrendMetric;
+  metric?: MetricKey;
   /** 이상치 발생일처럼 강조할 날짜(일간 보기에서만 표시) */
   markDate?: string;
 }) {
