@@ -10,7 +10,19 @@ export interface ToastMsg {
   id: number;
   message: string;
   type: "success" | "error" | "info";
-  action?: { label: string; href: string };
+  action?: { label: string; href?: string; onClick?: () => void };
+}
+
+/** 인사이트·이상치에서 분석 화면으로 들어간 맥락 — 돌아갈 때 이전 범위를 되돌린다. */
+export interface Drill {
+  /** 출발한 화면 경로와 이름 */
+  from: string;
+  fromLabel: string;
+  /** 무엇을 보러 왔는지 한 줄 */
+  label: string;
+  /** 표시할 날짜(이상치 발생일) */
+  date?: string;
+  prevFilters: Filters;
 }
 
 interface AppState {
@@ -33,6 +45,11 @@ interface AppState {
   openAnalysis: (record: AnalysisRecord) => void;
   saveReport: (title?: string) => SavedReport | null;
   deleteReport: (id: string) => void;
+  renameReport: (id: string, title: string) => void;
+  drill: Drill | null;
+  beginDrill: (d: Omit<Drill, "prevFilters">) => void;
+  /** restore=true면 출발 전 범위로 되돌린다 */
+  endDrill: (restore: boolean) => void;
   updateSettings: (s: Partial<AppSettings>) => void;
   resetDemo: () => void;
   /** 브라우저에 보관된 업로드 파일(최근 3개) */
@@ -82,6 +99,19 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
+/** 저장된 목록에서 형태가 맞지 않는 항목(손상·구버전)은 버린다. */
+function readList<T>(key: string, valid: (x: T) => boolean): T[] {
+  const raw = readJson<unknown>(key, []);
+  return Array.isArray(raw) ? (raw as T[]).filter((x) => x != null && valid(x)) : [];
+}
+const validReport = (r: SavedReport) =>
+  typeof r.id === "string" && typeof r.title === "string" && !!r.scope?.start && Array.isArray(r.kpis) &&
+  Array.isArray(r.findings) && Array.isArray(r.anomalies) && Array.isArray(r.recommendations) && Array.isArray(r.forecasts);
+const validRecord = (h: AnalysisRecord) => typeof h.id === "string" && typeof h.datasetId === "string" && typeof h.createdAt === "string";
+const validUpload = (d: DemoDataset) =>
+  typeof d.id === "string" && Array.isArray(d.rows) && d.rows.length > 0 && Array.isArray(d.channels) && Array.isArray(d.products);
+const readUploads = () => readList<DemoDataset>(KEYS.uploads, validUpload);
+
 function writeJson(key: string, value: unknown): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -93,7 +123,8 @@ function writeJson(key: string, value: unknown): boolean {
 
 /** 업로드 원본 보관 — 최근 3개까지, 용량 초과 시 오래된 것부터 비운다. */
 function storeUpload(ds: DemoDataset): boolean {
-  let list = readJson<DemoDataset[]>(KEYS.uploads, []).filter((d) => d.id !== ds.id);
+  // 같은 파일을 다시 올리면(이름·행 수 동일) 예전 사본을 대체한다.
+  let list = readUploads().filter((d) => d.id !== ds.id && !(d.name === ds.name && d.rows.length === ds.rows.length));
   list = [ds, ...list].slice(0, MAX_UPLOADS);
   while (list.length > 0) {
     if (writeJson(KEYS.uploads, list)) return list.some((d) => d.id === ds.id);
@@ -104,7 +135,7 @@ function storeUpload(ds: DemoDataset): boolean {
 
 export function findDataset(id: string): DemoDataset | null {
   if (id.startsWith("demo-")) return getDemoDataset(id) ?? null;
-  return readJson<DemoDataset[]>(KEYS.uploads, []).find((d) => d.id === id) ?? null;
+  return readUploads().find((d) => d.id === id) ?? null;
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -120,16 +151,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [readIds, setReadIds] = useState<string[]>([]);
   const [uploads, setUploads] = useState<DemoDataset[]>([]);
+  const [drill, setDrill] = useState<Drill | null>(null);
+  const lastSave = useRef<{ sig: string; at: number } | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     const s = { ...DEFAULT_SETTINGS, ...readJson<Partial<AppSettings>>(KEYS.settings, {}) };
     setSettings(s);
     setFiltersState(filtersFor(s.defaultPreset));
-    setHistory(readJson<AnalysisRecord[]>(KEYS.history, []));
-    setReports(readJson<SavedReport[]>(KEYS.reports, []));
-    setReadIds(readJson<string[]>(KEYS.read, []));
-    setUploads(readJson<DemoDataset[]>(KEYS.uploads, []));
+    setHistory(readList<AnalysisRecord>(KEYS.history, validRecord));
+    setReports(readList<SavedReport>(KEYS.reports, validReport));
+    setReadIds(readList<string>(KEYS.read, (x) => typeof x === "string"));
+    setUploads(readUploads());
     const active = readJson<{ id?: string } | null>(KEYS.active, null);
     const restored = active?.id ? findDataset(active.id) : null;
     // 어느 주소로 처음 들어와도 빈 화면이 아니도록 기본 샘플 데이터를 연결한다.
@@ -181,7 +214,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const startAnalysis = useCallback(
-    (ds: DemoDataset, navigateTo = "/dashboard") => {
+    (input: DemoDataset, navigateTo = "/dashboard") => {
       timers.current.forEach(clearTimeout);
       setAnalyzing(true);
       setAnalysisStep(0);
@@ -190,9 +223,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => setAnalysisStep(1), 500),
         setTimeout(() => setAnalysisStep(2), 1000),
         setTimeout(() => {
-          const isUpload = !ds.id.startsWith("demo-");
+          const isUpload = !input.id.startsWith("demo-");
+          // 같은 파일을 다시 올렸으면 예전 id를 이어 써서 이전 분석 기록도 계속 열리게 한다.
+          const same = isUpload
+            ? readUploads().find((d) => d.name === input.name && d.rows.length === input.rows.length)
+            : undefined;
+          const ds = same ? { ...input, id: same.id } : input;
           const restorable = isUpload ? storeUpload(ds) : true;
-          if (isUpload) setUploads(readJson<DemoDataset[]>(KEYS.uploads, []));
+          if (isUpload) setUploads(readUploads());
           const nextFilters = filtersFor(settings.defaultPreset);
           activate(ds);
           setFiltersState(nextFilters);
@@ -245,6 +283,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (title?: string) => {
       if (!dataset) return null;
       const report = buildReport(dataset, filters, title);
+      // 연속 클릭으로 같은 보고서가 두 번 저장되지 않게 막는다.
+      if (lastSave.current && lastSave.current.sig === report.signature && Date.now() - lastSave.current.at < 1500) return null;
+      lastSave.current = { sig: report.signature, at: Date.now() };
       setReports((prev) => {
         const next = [report, ...prev].slice(0, 30);
         if (!writeJson(KEYS.reports, next)) writeJson(KEYS.reports, next.slice(0, 10));
@@ -256,16 +297,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [dataset, filters, showToast]
   );
 
+  const persistReports = useCallback((next: SavedReport[]) => {
+    setReports(next);
+    writeJson(KEYS.reports, next);
+  }, []);
+
   const deleteReport = useCallback(
     (id: string) => {
-      setReports((prev) => {
-        const next = prev.filter((r) => r.id !== id);
-        writeJson(KEYS.reports, next);
-        return next;
+      const before = reports;
+      const removed = before.find((r) => r.id === id);
+      if (!removed) return;
+      persistReports(before.filter((r) => r.id !== id));
+      // 실수로 지웠을 때 바로 되돌릴 수 있게 한다.
+      showToast(`'${removed.title}'을(를) 삭제했습니다.`, "info", {
+        label: "되돌리기",
+        onClick: () => persistReports(before),
       });
-      showToast("보고서를 삭제했습니다.", "info");
     },
-    [showToast]
+    [reports, persistReports, showToast]
+  );
+
+  const renameReport = useCallback(
+    (id: string, title: string) => {
+      const t = title.trim();
+      if (!t) return;
+      persistReports(reports.map((r) => (r.id === id ? { ...r, title: t } : r)));
+    },
+    [reports, persistReports]
+  );
+
+  const beginDrill = useCallback(
+    (d: Omit<Drill, "prevFilters">) => {
+      // 이미 드릴 중이면 처음 출발점과 범위를 유지하고, 보고 있는 대상만 바꾼다.
+      setDrill((cur) => (cur ? { ...cur, label: d.label, date: d.date } : { ...d, prevFilters: filters }));
+    },
+    [filters]
+  );
+
+  const endDrill = useCallback(
+    (restore: boolean) => {
+      if (drill && restore) setFiltersState(drill.prevFilters);
+      setDrill(null);
+    },
+    [drill]
   );
 
   const updateSettings = useCallback(
@@ -284,6 +358,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const switchDataset = useCallback(
     (ds: DemoDataset) => {
       activate(ds);
+      setDrill(null);
       setFiltersState(filtersFor(settings.defaultPreset));
       showToast(`'${ds.name}'(으)로 바꿨습니다.`, "info");
     },
@@ -329,6 +404,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       openAnalysis,
       saveReport,
       deleteReport,
+      renameReport,
+      drill,
+      beginDrill,
+      endDrill,
       updateSettings,
       resetDemo,
       uploads,
@@ -339,7 +418,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }),
     [ready, dataset, analyzing, analysisStep, filters, settings, history, reports, toasts, readIds,
      setFilters, setPreset, setCustomRange, resetFilters, startAnalysis, openAnalysis, saveReport,
-     deleteReport, updateSettings, resetDemo, uploads, switchDataset, showToast, dismissToast, markRead]
+     deleteReport, renameReport, drill, beginDrill, endDrill, updateSettings, resetDemo, uploads, switchDataset, showToast, dismissToast, markRead]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

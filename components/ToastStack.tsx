@@ -22,7 +22,7 @@ export default function ToastStack() {
           {t.type === "error" && <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-negative" aria-hidden />}
           {t.type === "info" && <Info className="mt-0.5 h-5 w-5 shrink-0 text-ink-soft" aria-hidden />}
           <span className="flex-1 text-ink">{t.message}</span>
-          {t.action && (
+          {t.action?.href && (
             <Link
               href={t.action.href}
               onClick={() => dismissToast(t.id)}
@@ -30,6 +30,17 @@ export default function ToastStack() {
             >
               {t.action.label}
             </Link>
+          )}
+          {t.action?.onClick && (
+            <button
+              onClick={() => {
+                t.action?.onClick?.();
+                dismissToast(t.id);
+              }}
+              className="shrink-0 font-semibold text-brand hover:text-brand-dark"
+            >
+              {t.action.label}
+            </button>
           )}
           <button
             onClick={() => dismissToast(t.id)}

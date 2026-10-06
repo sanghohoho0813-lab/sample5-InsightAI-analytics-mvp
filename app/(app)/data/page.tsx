@@ -17,6 +17,7 @@ export default function DataPage() {
   const { ready, dataset, history, startAnalysis, openAnalysis } = useApp();
   const demos = getDemoDatasets();
   const [showPreview, setShowPreview] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   // 데모 기간은 접속 시점 기준으로 계산되므로 하이드레이션 이후에 표시한다.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -115,7 +116,7 @@ export default function DataPage() {
           </p>
         ) : (
           <ul className="mt-2 divide-y divide-line">
-            {history.map((h) => {
+            {(showAll ? history : history.slice(0, 5)).map((h) => {
               const canOpen = reopenable.has(h.id);
               const isCurrent = dataset?.id === h.datasetId;
               return (
@@ -147,6 +148,13 @@ export default function DataPage() {
               );
             })}
           </ul>
+        )}
+        {history.length > 5 && (
+          <div className="border-t border-line px-5 py-2 md:px-6">
+            <button onClick={() => setShowAll((v) => !v)} className={btn.quiet} aria-expanded={showAll}>
+              {showAll ? "최근 5건만 보기" : `전체 ${history.length}건 보기`}
+            </button>
+          </div>
         )}
       </Panel>
     </>

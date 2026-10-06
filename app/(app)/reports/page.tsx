@@ -3,13 +3,13 @@
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import EmptyState from "@/components/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
 import { Panel, PanelHeader } from "@/components/Panel";
-import { useApp } from "@/lib/store";
+import { findDataset, useApp } from "@/lib/store";
 import { BRAND } from "@/lib/brand";
 import { reportSignature, scopeLabel, scopeOf } from "@/lib/report";
 import { formatKRW, formatNumber, formatValue } from "@/lib/format";
@@ -20,56 +20,112 @@ const DATETIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeSty
 
 function ReportDetail({ report }: { report: SavedReport }) {
   const router = useRouter();
-  const { deleteReport, showToast } = useApp();
-  const [confirming, setConfirming] = useState(false);
+  const { dataset, deleteReport, renameReport, showToast, switchDataset, setCustomRange, setFilters } = useApp();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(report.title);
+  const source = findDataset(report.datasetId);
 
   const section = "border-t border-line px-5 py-6 md:px-8";
   const h = "text-card font-bold text-ink";
+
+  const saveTitle = () => {
+    const t = draft.trim();
+    if (!t) return;
+    if (t !== report.title) {
+      renameReport(report.id, t);
+      showToast("제목을 바꿨습니다.", "success");
+    }
+    setEditing(false);
+  };
+
+  // 보고서를 만든 범위 그대로 대시보드를 다시 연다.
+  const openScope = () => {
+    if (!source) return;
+    if (dataset?.id !== source.id) switchDataset(source);
+    setCustomRange(report.scope.start, report.scope.end);
+    setFilters({ channel: report.scope.channel, product: report.scope.product });
+    router.push("/dashboard");
+  };
 
   return (
     <>
       <Link href="/reports" className="no-print mb-4 inline-flex min-h-11 items-center gap-1 text-sub font-semibold text-ink-soft hover:text-ink">
         <ArrowLeft className="h-4 w-4" aria-hidden /> 보고서 목록
       </Link>
-      <PageHeader
-        title={report.title}
-        description={`${report.datasetName} · ${scopeLabel(report.scope)}`}
-        actions={
-          <div className="no-print flex flex-wrap gap-2">
-            {confirming ? (
-              <>
-                <button
-                  onClick={() => {
-                    deleteReport(report.id);
-                    router.push("/reports");
-                  }}
-                  className={btn.danger}
-                >
-                  삭제 확인
+
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0 flex-1">
+          {editing ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveTitle();
+              }}
+              className="flex flex-col gap-2 sm:flex-row"
+            >
+              <label htmlFor="rename" className="sr-only">
+                보고서 제목
+              </label>
+              <input
+                id="rename"
+                autoFocus
+                value={draft}
+                maxLength={60}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && (setDraft(report.title), setEditing(false))}
+                className={`${field} h-12 w-full text-lead font-semibold sm:flex-1`}
+              />
+              <div className="flex gap-2">
+                <button type="submit" disabled={!draft.trim()} className={btn.primary}>
+                  저장
                 </button>
-                <button onClick={() => setConfirming(false)} className={btn.secondary}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraft(report.title);
+                    setEditing(false);
+                  }}
+                  className={btn.secondary}
+                >
                   취소
                 </button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => setConfirming(true)} className={btn.secondary}>
-                  삭제
-                </button>
-                <button
-                  onClick={() => {
-                    showToast("인쇄 창에서 '대상 → PDF로 저장'을 선택하세요.", "info");
-                    setTimeout(() => window.print(), 300);
-                  }}
-                  className={btn.primary}
-                >
-                  PDF로 저장
-                </button>
-              </>
-            )}
-          </div>
-        }
-      />
+              </div>
+            </form>
+          ) : (
+            <div className="flex items-start gap-1">
+              <h1 className="min-w-0 text-page font-bold tracking-tight text-ink">{report.title}</h1>
+              <button
+                onClick={() => setEditing(true)}
+                className="no-print mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-ink-dim hover:bg-surface hover:text-ink"
+                aria-label="제목 수정"
+                title="제목 수정"
+              >
+                <Pencil className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          )}
+          <p className="mt-2 text-body text-ink-soft">
+            {report.title.includes(report.datasetName) ? "" : `${report.datasetName} · `}
+            {scopeLabel(report.scope)}
+          </p>
+        </div>
+        <div className="no-print flex shrink-0 flex-wrap gap-2">
+          {source && (
+            <button onClick={openScope} className={btn.secondary}>
+              이 범위로 대시보드 열기
+            </button>
+          )}
+          <button
+            onClick={() => {
+              showToast("인쇄 창에서 '대상 → PDF로 저장'을 선택하세요.", "info");
+              setTimeout(() => window.print(), 300);
+            }}
+            className={btn.primary}
+          >
+            PDF로 저장
+          </button>
+        </div>
+      </div>
 
       <Panel as="article" className="overflow-hidden" aria-label="보고서 본문">
         <div className="px-5 py-6 md:px-8">
@@ -85,10 +141,10 @@ function ReportDetail({ report }: { report: SavedReport }) {
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sub">
               <thead>
-                <tr className="border-b border-line text-left text-caption text-ink-dim">
+                <tr className="whitespace-nowrap border-b border-line text-left text-caption text-ink-dim">
                   <th className="py-2 font-semibold">지표</th>
                   <th className="py-2 text-right font-semibold">이번 기간</th>
-                  <th className="py-2 text-right font-semibold">이전 기간</th>
+                  <th className="hidden py-2 text-right font-semibold sm:table-cell">이전 기간</th>
                   <th className="py-2 text-right font-semibold">변화</th>
                 </tr>
               </thead>
@@ -97,7 +153,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
                   <tr key={k.key} className="border-b border-line/70 last:border-0">
                     <td className="py-3 text-ink">{k.label}</td>
                     <td className="tabular py-3 text-right font-semibold text-ink">{formatValue(k.value, k.format)}</td>
-                    <td className="tabular py-3 text-right text-ink-soft">{k.comparable === false ? "–" : formatValue(k.prevValue, k.format)}</td>
+                    <td className="tabular hidden py-3 text-right text-ink-soft sm:table-cell">{k.comparable === false ? "–" : formatValue(k.prevValue, k.format)}</td>
                     {k.comparable === false ? (
                       <td className="py-3 text-right text-ink-dim">–</td>
                     ) : (
@@ -181,6 +237,18 @@ function ReportDetail({ report }: { report: SavedReport }) {
           </ol>
         </div>
       </Panel>
+
+      <div className="no-print mt-4 flex justify-end">
+        <button
+          onClick={() => {
+            deleteReport(report.id);
+            router.push("/reports");
+          }}
+          className="inline-flex min-h-11 items-center gap-1 px-2 text-sub font-semibold text-ink-dim transition-colors hover:text-negative"
+        >
+          <Trash2 className="h-4 w-4" aria-hidden /> 이 보고서 삭제
+        </button>
+      </div>
     </>
   );
 }

@@ -39,7 +39,7 @@ export function InsightList({ insights, compact = false }: { insights: Insight[]
             <div className="mt-1 flex flex-wrap items-center gap-x-4">
               {ins.drill && (
                 <button
-                  onClick={() => toSegment(ins.drill!)}
+                  onClick={() => toSegment(ins.drill!, ins.title)}
                   className="inline-flex min-h-11 items-center text-sub font-semibold text-brand hover:text-brand-dark"
                 >
                   관련 데이터 보기 →
@@ -70,6 +70,13 @@ const PRIORITY = {
 
 /** 실행 제안 — 효과 수치는 추정치임을 밝힌다. */
 export function RecommendationList({ items }: { items: Recommendation[] }) {
+  if (items.length === 0) {
+    return (
+      <p className="px-5 py-8 text-center text-sub text-ink-dim md:px-6">
+        제안을 만들 만한 변화가 아직 없습니다. 주문 수·채널·상품 컬럼이 있거나 기간이 길면 제안이 늘어납니다.
+      </p>
+    );
+  }
   return (
     <ol className="divide-y divide-line">
       {items.map((r) => {

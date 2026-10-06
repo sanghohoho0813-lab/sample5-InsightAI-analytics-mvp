@@ -87,7 +87,7 @@ function contributionDriver(dataset: DemoDataset, filters: Filters): Why | null 
     description:
       share > 0 && share <= 100
         ? `전체 ${up ? "증가" : "감소"}분 ${formatKRW(Math.abs(total))} 중 ${share.toFixed(0)}%가 ${name}에서 나왔습니다.`
-        : `다른 ${unit}의 움직임을 넘어설 만큼 ${name} 매출이 크게 ${up ? "늘었습니다" : "줄었습니다"}.`,
+        : `${name}이(가) 크게 ${up ? "늘어 다른" : "줄어 다른"} ${unit}의 ${up ? "감소" : "증가"}를 ${up ? "메우고도 남았습니다" : "모두 상쇄했습니다"}.`,
     drill: dim === "channel" ? { channel: name, metric: "revenue" } : { product: name, metric: "revenue" },
   };
 }

@@ -22,6 +22,25 @@ export default function AiQueryPage() {
   const [thinking, setThinking] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // 대화는 데이터셋별로 이 탭이 열려 있는 동안 유지한다(다른 화면에 다녀와도 남아 있게).
+  const key = dataset ? `insightai.chat.${dataset.id}` : null;
+  useEffect(() => {
+    if (!key) return;
+    try {
+      setMessages(JSON.parse(sessionStorage.getItem(key) ?? "[]"));
+    } catch {
+      setMessages([]);
+    }
+  }, [key]);
+  useEffect(() => {
+    if (!key) return;
+    try {
+      sessionStorage.setItem(key, JSON.stringify(messages.slice(-30)));
+    } catch {
+      // 저장 공간을 쓸 수 없으면 이 화면에서만 유지
+    }
+  }, [key, messages]);
+
   useEffect(() => {
     if (messages.length) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages, thinking]);
@@ -52,6 +71,13 @@ export default function AiQueryPage() {
       <PageHeader
         title="데이터 질의"
         description="최근 30일 데이터를 계산해 답합니다"
+        actions={
+          messages.length > 0 ? (
+            <button onClick={() => setMessages([])} disabled={thinking} className={btn.secondary}>
+              대화 지우기
+            </button>
+          ) : undefined
+        }
       />
 
       <div className="card flex flex-col">
@@ -122,6 +148,8 @@ export default function AiQueryPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="예: 광고 효율이 가장 높은 채널은?"
+              maxLength={200}
+              autoComplete="off"
               className={`${field} h-12 flex-1`}
             />
             <button type="submit" disabled={!input.trim() || thinking} className={`${btn.primary} h-12 px-4`} aria-label="질문 보내기">

@@ -89,7 +89,7 @@ export default function DashboardPage() {
             {summary.why && <dd className="mt-1 text-sub text-ink-soft">{summary.why.description}</dd>}
             {summary.why?.drill && (
               <dd>
-                <button onClick={() => toSegment(summary.why!.drill!)} className={action}>
+                <button onClick={() => toSegment(summary.why!.drill!, summary.why!.title)} className={action}>
                   {summary.why.drill.channel ?? summary.why.drill.product}만 보기 →
                 </button>
               </dd>
@@ -110,7 +110,7 @@ export default function DashboardPage() {
                 </dd>
                 <dd>
                   <button
-                    onClick={() => toMoment(summary.alert!.date, summary.alert!.channel, summary.alert!.metricKey)}
+                    onClick={() => toMoment(summary.alert!.date, summary.alert!.channel, summary.alert!.metricKey, summary.alert!.title)}
                     className={action}
                   >
                     그날 전후 분석 보기 →

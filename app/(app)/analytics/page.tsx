@@ -1,7 +1,9 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { formatDateKR } from "@/lib/format";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
@@ -59,7 +61,11 @@ function usableDims(ds: DemoDataset) {
 
 function AnalyticsView() {
   const params = useSearchParams();
-  const { ready, dataset, filters, setFilters } = useApp();
+  const { ready, dataset, filters, setFilters, drill } = useApp();
+  const router = useRouter();
+  // 드릴로 들어온 직후의 범위 — 사용자가 범위를 바꾸면 제목을 일반 '분석'으로 되돌린다.
+  const [arrived] = useState(() => JSON.stringify(filters));
+  const focused = drill && JSON.stringify(filters) === arrived ? drill : null;
   const initial = params.get("metric") as MetricKey | null;
   const [picked, setPicked] = useState<MetricKey>(initial && METRIC_KEYS.includes(initial) ? initial : "revenue");
   const [dimChoice, setDimension] = useState<Dimension>("channel");
@@ -115,16 +121,28 @@ function AnalyticsView() {
 
   return (
     <>
+      {drill && (
+        <button
+          onClick={() => router.push(drill.from)}
+          className="mb-4 inline-flex min-h-11 items-center gap-1 text-sub font-semibold text-ink-soft hover:text-ink"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden /> {drill.fromLabel}로 돌아가기
+        </button>
+      )}
       <PageHeader
-        title="분석"
-        description={comparisonLabel(dataset, filters)}
+        title={focused ? focused.label : "분석"}
+        description={
+          focused?.date
+            ? `${formatDateKR(focused.date)} 전후 · ${comparisonLabel(dataset, filters)}`
+            : comparisonLabel(dataset, filters)
+        }
       />
       <FilterToolbar dataset={dataset} />
 
-      <KpiStrip kpis={data.kpis} selected={metric} onSelect={setPicked} />
-
-      <div className="mt-6">
-        <RevenueTrendChart points={data.trend} metric={metric} />
+      {/* 특정 변화를 보러 들어왔으면 그 차트를 먼저 보여준다 */}
+      <div className={`flex flex-col gap-6 ${focused ? "flex-col-reverse" : ""}`}>
+        <KpiStrip kpis={data.kpis} selected={metric} onSelect={setPicked} />
+        <RevenueTrendChart points={data.trend} metric={metric} markDate={focused?.date} />
       </div>
 
       {dims.length > 0 && (

@@ -30,7 +30,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="설정" description="분석 기본값과 데모 데이터를 관리합니다. 설정은 이 브라우저에 저장됩니다." />
+      <PageHeader title="설정" description="설정은 이 브라우저에 저장됩니다" />
 
       <Panel>
         <PanelHeader title="분석" />
@@ -53,7 +53,7 @@ export default function SettingsPage() {
           </Row>
           <Row
             label="분석 엔진"
-            desc="지표 집계·이상치 탐지·인사이트는 규칙 기반으로 계산합니다. 서버에 AI_API_KEY를 설정하면 데이터 질의 답변에 LLM을 사용합니다."
+            desc="지표 집계·이상치 탐지·인사이트를 정해진 규칙으로 계산합니다. 같은 데이터면 언제나 같은 결과가 나옵니다."
           >
             <span className="rounded-full border border-line-strong px-3 py-1 text-meta font-semibold text-ink-soft">규칙 기반 · 데모</span>
           </Row>

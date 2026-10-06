@@ -5,6 +5,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -54,9 +55,12 @@ const METRIC_META: Record<
 export default function RevenueTrendChart({
   points,
   metric = "revenue",
+  markDate,
 }: {
   points: DailyPoint[];
   metric?: TrendMetric;
+  /** 이상치 발생일처럼 강조할 날짜(일간 보기에서만 표시) */
+  markDate?: string;
 }) {
   const [unit, setUnit] = useState<Unit>("day");
   const [selected, setSelected] = useState<DailyPoint | null>(null);
@@ -146,6 +150,14 @@ export default function RevenueTrendChart({
                 return <ChartTooltip label={unit === "month" ? String(label) : formatDateKR(String(label))} rows={rows} />;
               }}
             />
+            {markDate && unit === "day" && data.some((p) => p.date === markDate) && (
+              <ReferenceLine
+                x={markDate}
+                stroke={COLORS.negative}
+                strokeDasharray="4 3"
+                label={{ value: "발생일", position: "insideTopRight", fill: COLORS.negative, fontSize: 12 }}
+              />
+            )}
             {hasPrev && (
               <Area
                 type="monotone"

@@ -27,7 +27,7 @@ export function generateInsights({ rows, filters, derived = [] }: Context): Insi
 
   // 1) 매출 상승/하락 요인: 비중 변화가 가장 큰 채널 (채널이 2개 이상이고 이전 기간이 있을 때)
   const mover = [...shares].sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct))[0];
-  if (comparable && shares.length > 1 && mover && Math.abs(mover.changePct) >= 0.5) {
+  if (comparable && shares.length > 1 && mover && Math.abs(mover.changePct) >= 1) {
     const up = mover.changePct > 0;
     insights.push({
       id: "channel-mix",
@@ -174,7 +174,7 @@ export function generateRecommendations(ctx: Context): Recommendation[] {
     recs.push({
       id: "rec-stock",
       title: "재고 확보",
-      description: `${product.title.split("'")[1] ? `'${product.title.split("'")[1]}'` : "성장 상품"}의 판매량이 최근 2주간 빠르게 증가했습니다. 재고와 상세페이지 노출을 강화하세요.`,
+      description: `${product.title.split("'")[1] ? `'${product.title.split("'")[1]}'` : "성장 상품"} 매출이 상품 중 가장 빠르게 늘고 있습니다. 품절되지 않게 재고를 확보하고 노출을 늘리세요.`,
       expectedEffect: "품절 리스크 감소",
       priority: "medium",
     });

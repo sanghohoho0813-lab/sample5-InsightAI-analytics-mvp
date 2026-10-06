@@ -63,7 +63,7 @@ interface Hit {
  * 1) 전일 대비 ±30% 이상 변화
  * 2) 최근 7일 평균 대비 ±2 표준편차 이탈(변화폭 15% 이상)
  * 채널 단위까지 검사해 원인 채널을 표시하고, 소음을 줄이기 위해
- * - 급감 다음 날의 반등(회복)은 따로 알리지 않고
+ * - 급감 다음 날의 반등, 급증 다음 날의 하락(제자리로 돌아온 것)은 따로 알리지 않고
  * - 같은 날·같은 범위·같은 방향의 여러 지표 변화는 한 건으로 묶는다.
  */
 export function detectAnomalies(
@@ -88,6 +88,7 @@ export function detectAnomalies(
   const scan = (scope: string, series: ReturnType<typeof dailySeries>) => {
     for (const m of metrics) {
       let lastDropAt = -10;
+      let lastSurgeAt = -10;
       for (let i = 7; i < series.length; i++) {
         const today = series[i][m.key] as number;
         const yesterday = series[i - 1][m.key] as number;
@@ -105,9 +106,12 @@ export function detectAnomalies(
 
         const delta = bigDayMove ? dayDelta : meanDelta;
         const inWindow = windowSet.has(series[i].date);
-        // 급감 직후 1~2일 안의 반등은 평소 수준으로 돌아온 것이므로 알리지 않는다.
-        if (delta > 0 && i - lastDropAt <= 2 && Math.abs(meanDelta) < 30) continue;
+        // 급감 직후의 반등, 급증 직후의 하락은 평소 수준으로 돌아온 것이므로 알리지 않는다.
+        const settling = Math.abs(meanDelta) < 30;
+        if (delta > 0 && i - lastDropAt <= 2 && settling) continue;
+        if (delta < 0 && i - lastSurgeAt <= 2 && settling) continue;
         if (delta < 0) lastDropAt = i;
+        else lastSurgeAt = i;
         if (!inWindow) continue;
 
         hits.push({

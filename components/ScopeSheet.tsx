@@ -73,12 +73,30 @@ export default function ScopeSheet({ dataset, showPeriod = true }: { dataset: De
   useEffect(() => {
     if (!open) return;
     document.body.classList.add("sheet-open");
+    const trigger = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+      // Tab 이동이 시트 밖으로 빠져나가지 않게 한다.
+      if (e.key === "Tab" && panelRef.current) {
+        const items = panelRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), select, input");
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
     document.addEventListener("keydown", onKey);
     return () => {
       document.body.classList.remove("sheet-open");
       document.removeEventListener("keydown", onKey);
+      trigger?.focus();
     };
   }, [open]);
 

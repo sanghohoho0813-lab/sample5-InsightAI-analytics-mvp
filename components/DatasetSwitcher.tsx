@@ -9,7 +9,7 @@ import { DemoDataset } from "@/lib/types";
 
 /** 헤더의 '지금 보는 데이터' — 눌러서 샘플·업로드 파일 사이를 바로 바꾼다. */
 export default function DatasetSwitcher({ className = "" }: { className?: string }) {
-  const { dataset, uploads, switchDataset } = useApp();
+  const { ready, dataset, uploads, switchDataset } = useApp();
   const { open, setOpen, ref } = usePopover<HTMLDivElement>();
   const demos = getDemoDatasets();
 
@@ -37,6 +37,15 @@ export default function DatasetSwitcher({ className = "" }: { className?: string
       </li>
     );
   };
+
+  // 저장된 상태를 불러오기 전에는 '데이터 선택'이 잠깐 보이지 않도록 자리만 잡는다.
+  if (!ready) {
+    return (
+      <div className={`min-w-0 px-2 ${className}`} aria-hidden>
+        <div className="skeleton h-5 w-36" />
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className={`relative min-w-0 ${className}`}>

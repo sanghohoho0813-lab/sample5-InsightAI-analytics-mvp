@@ -2,6 +2,7 @@ import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
 import TopBar from "@/components/TopBar";
 import AppFooter from "@/components/AppFooter";
+import DrillWatcher from "@/components/DrillWatcher";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -17,6 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <MobileNav />
+      <DrillWatcher />
     </div>
   );
 }

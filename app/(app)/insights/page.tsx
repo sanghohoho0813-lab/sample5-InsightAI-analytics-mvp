@@ -51,7 +51,7 @@ export default function InsightsPage() {
 
         <div className="space-y-6">
           <Panel>
-            <PanelHeader title="실행 제안" description="우선순위 순" />
+            <PanelHeader title="실행 제안" />
             <div className="mt-2">
               <RecommendationList items={data.recommendations} />
             </div>

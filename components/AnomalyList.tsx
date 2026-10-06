@@ -80,7 +80,7 @@ export default function AnomalyList({
                 <p className="text-sub text-ink-soft">{a.description}</p>
                 <p className="mt-1 text-meta text-ink-dim">{a.detail}</p>
                 <button
-                  onClick={() => toMoment(a.date, a.channel, a.metricKey)}
+                  onClick={() => toMoment(a.date, a.channel, a.metricKey, a.title)}
                   className="mt-2 inline-flex min-h-11 items-center text-sub font-semibold text-brand hover:text-brand-dark"
                 >
                   그날 전후 분석 보기 →
