@@ -23,17 +23,22 @@ const SYSTEM = [
 /** 인스턴스 단위의 가벼운 호출 제한(분당 IP별). 여러 인스턴스 간 공유가 필요하면 외부 저장소로 옮긴다. */
 const WINDOW_MS = 60_000;
 const LIMIT = 20;
+const MAX_TRACKED_IPS = 5_000;
 const hits = new Map<string, number[]>();
 function rateLimited(ip: string): boolean {
   const now = Date.now();
+  // 오래 켜져 있는 서버에서 맵이 끝없이 커지지 않도록, 한도를 넘으면 창이 지난 기록을 비운다.
+  if (hits.size > MAX_TRACKED_IPS) {
+    for (const [key, times] of hits) if (now - times[times.length - 1] >= WINDOW_MS) hits.delete(key);
+  }
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
   recent.push(now);
   hits.set(ip, recent);
   return recent.length > LIMIT;
 }
 
-const fallback = (reason: Extract<AiResponse, { mode: "fallback" }>["reason"], status = 200) =>
-  NextResponse.json<AiResponse>({ mode: "fallback", reason }, { status });
+const fallback = (reason: Extract<AiResponse, { mode: "fallback" }>["reason"]) =>
+  NextResponse.json<AiResponse>({ mode: "fallback", reason });
 
 export async function POST(req: Request) {
   const parsed = parseAiRequest(await req.json().catch(() => null));
@@ -44,7 +49,8 @@ export async function POST(req: Request) {
   if (rateLimited(ip)) return NextResponse.json({ error: "요청이 너무 잦습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
 
   const { question, context } = parsed.value;
-  const client = new Anthropic({ apiKey: API_KEY, timeout: 15_000, maxRetries: 1 });
+  // 브라우저는 20초 뒤 규칙 기반으로 넘어가므로, 그 안에 끝나도록 재시도 없이 15초로 제한한다.
+  const client = new Anthropic({ apiKey: API_KEY, timeout: 15_000, maxRetries: 0 });
 
   try {
     const response = await client.beta.messages.create({
