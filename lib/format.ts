@@ -54,3 +54,15 @@ export function formatValue(
       return formatNumber(value);
   }
 }
+
+/** 차트 축 눈금용 — 눈금 간격이 좁아도 같은 라벨이 반복되지 않게 소수 한 자리까지 쓴다. */
+export function formatAxisKRW(value: number): string {
+  const a = Math.abs(value);
+  const fmt = (n: number) => {
+    const r = Math.round(n * 10) / 10;
+    return Math.abs(r) >= 100 || Number.isInteger(r) ? Math.round(r).toLocaleString("ko-KR") : r.toFixed(1);
+  };
+  if (a >= 1e8) return `${fmt(value / 1e8)}억`;
+  if (a >= 1e4) return `${fmt(value / 1e4)}만`;
+  return Math.round(value).toLocaleString("ko-KR");
+}

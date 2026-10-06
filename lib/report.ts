@@ -1,9 +1,9 @@
-import { computeKpis, filterDimensions, resolveDates } from "./analytics-engine";
-import { detectAnomalies } from "./anomaly-engine";
+import { applyFilters, computeKpis, filterDimensions, isComparable, resolveDates } from "./analytics-engine";
 import { computeForecasts } from "./forecast-engine";
 import { generateInsights, generateRecommendations } from "./insight-generator";
+import { anomaliesFor, availableKpis, canSplit, insightContext } from "./dataset-meta";
 import { formatChange, formatDateKR, formatKRW } from "./format";
-import { Anomaly, DemoDataset, Filters, Insight, KpiResult, Recommendation, SavedReport } from "./types";
+import { Anomaly, DemoDataset, Filters, Insight, KpiResult, MetricKey, Recommendation, SavedReport } from "./types";
 
 /** 분석 범위를 사람이 읽을 수 있게 — "9월 1일 ~ 9월 30일 · 전체 채널" */
 export function scopeOf(dataset: DemoDataset, filters: Filters) {
@@ -24,16 +24,31 @@ export function scopeLabel(scope: SavedReport["scope"]): string {
   return parts.join(" · ");
 }
 
+/** 비교 기준을 한 줄로 — "최근 30일 · 이전 30일과 비교" */
+export function comparisonLabel(dataset: DemoDataset, filters: Filters): string {
+  const { currentDates } = resolveDates(dataset.rows, filters);
+  const n = currentDates.length;
+  const head = filters.preset === "custom" ? `선택한 ${n}일` : `최근 ${n}일`;
+  return isComparable(dataset.rows, filters) ? `${head} · 이전 ${n}일과 비교` : `${head} · 비교할 이전 기간 없음`;
+}
+
 export function reportSignature(dataset: DemoDataset, filters: Filters): string {
   const s = scopeOf(dataset, filters);
   return [dataset.id, s.start, s.end, s.channel, s.product].join("|");
 }
 
+export interface Why {
+  title: string;
+  description: string;
+  drill?: { channel?: string; product?: string; metric?: MetricKey };
+}
+
 export interface Summary {
+  comparable: boolean;
   revenue: KpiResult;
   headline: string;
-  /** 왜 — 가장 큰 변화 요인 */
-  why: Insight | null;
+  /** 왜 — 변화를 가장 많이 만든 채널(또는 상품) */
+  why: Why | null;
   /** 지금 확인할 것 — 가장 심각한 이상치 */
   alert: Anomaly | null;
   /** 다음 행동 */
@@ -44,25 +59,73 @@ export interface Summary {
   recommendations: Recommendation[];
 }
 
+/**
+ * 기여도 분석 — 매출 증감분을 채널(채널을 골랐으면 상품)별로 나눠
+ * 변화 방향과 같은 쪽으로 가장 크게 움직인 항목을 찾는다.
+ */
+function contributionDriver(dataset: DemoDataset, filters: Filters): Why | null {
+  const dim: "channel" | "product" | null =
+    filters.channel === "all" && canSplit(dataset, "channel")
+      ? "channel"
+      : filters.product === "all" && canSplit(dataset, "product")
+        ? "product"
+        : null;
+  if (!dim) return null;
+  const { current, previous } = applyFilters(dataset.rows, filters);
+  const delta = new Map<string, number>();
+  for (const r of current) delta.set(r[dim], (delta.get(r[dim]) ?? 0) + r.revenue);
+  for (const r of previous) delta.set(r[dim], (delta.get(r[dim]) ?? 0) - r.revenue);
+  const total = Array.from(delta.values()).reduce((a, b) => a + b, 0);
+  const sign = total >= 0 ? 1 : -1;
+  const [name, d] = Array.from(delta.entries()).sort((a, b) => b[1] * sign - a[1] * sign)[0] ?? [];
+  if (name == null || d == null || d * sign <= 0) return null;
+  const up = d >= 0;
+  const share = total !== 0 ? (d / total) * 100 : 0;
+  const unit = dim === "channel" ? "채널" : "상품";
+  return {
+    title: `${name} 매출 ${up ? "+" : "−"}${formatKRW(Math.abs(d))}`,
+    description:
+      share > 0 && share <= 100
+        ? `전체 ${up ? "증가" : "감소"}분 ${formatKRW(Math.abs(total))} 중 ${share.toFixed(0)}%가 ${name}에서 나왔습니다.`
+        : `다른 ${unit}의 움직임을 넘어설 만큼 ${name} 매출이 크게 ${up ? "늘었습니다" : "줄었습니다"}.`,
+    drill: dim === "channel" ? { channel: name, metric: "revenue" } : { product: name, metric: "revenue" },
+  };
+}
+
 /** 대시보드·보고서 공통 요약: 답(무엇이 변했나) → 이유 → 다음 행동 */
 export function summarize(dataset: DemoDataset, filters: Filters): Summary {
-  const ctx = { rows: dataset.rows, filters };
-  const kpis = computeKpis(dataset.rows, filters);
+  const ctx = insightContext(dataset, filters);
+  const kpis = availableKpis(computeKpis(dataset.rows, filters), dataset);
   const revenue = kpis.find((k) => k.key === "revenue") ?? kpis[0];
+  const comparable = revenue.comparable;
+  const { currentDates } = resolveDates(dataset.rows, filters);
   const insights = generateInsights(ctx);
-  const anomalies = detectAnomalies(dataset.rows, filters);
+  const anomalies = anomaliesFor(dataset, filters);
   const recommendations = generateRecommendations(ctx);
   const up = revenue.changePct >= 0;
-  const headline = `매출 ${formatKRW(revenue.value)}, 이전 같은 기간보다 ${Math.abs(revenue.changePct).toFixed(1)}% ${up ? "늘었습니다" : "줄었습니다"}.`;
-  // 매출이 줄었으면 부정적 요인을, 늘었으면 긍정적 요인을 먼저 설명한다.
-  const why =
-    insights.find((i) => (up ? i.impact === "positive" : i.impact === "negative")) ?? insights[0] ?? null;
-  const alert = anomalies.find((a) => a.severity !== "info") ?? null;
+
+  const headline = comparable
+    ? `매출 ${formatKRW(revenue.value)}, 이전 ${currentDates.length}일보다 ${Math.abs(revenue.changePct).toFixed(1)}% ${up ? "늘었습니다" : "줄었습니다"}.`
+    : `최근 ${currentDates.length}일 매출은 ${formatKRW(revenue.value)}입니다.`;
+
+  let why: Why | null = comparable ? contributionDriver(dataset, filters) : null;
+  if (!why && comparable) {
+    const ins = insights.find((i) => (up ? i.impact === "positive" : i.impact === "negative")) ?? insights[0];
+    if (ins) why = { title: ins.title, description: ins.description, drill: ins.drill };
+  }
+  if (!why && !comparable) {
+    why = {
+      title: "증감 비교 불가",
+      description: "이전 같은 기간의 데이터가 없어 무엇이 변했는지는 계산하지 않았습니다. 기간을 줄이면 비교할 수 있습니다.",
+    };
+  }
+
   return {
+    comparable,
     revenue,
     headline,
     why,
-    alert,
+    alert: anomalies.find((a) => a.severity !== "info") ?? null,
     next: recommendations[0] ?? null,
     kpis,
     insights,
@@ -86,8 +149,16 @@ export function buildReport(dataset: DemoDataset, filters: Filters, title?: stri
     datasetName: dataset.name,
     signature: reportSignature(dataset, filters),
     scope,
-    headline: `${s.headline} ${s.why ? s.why.description : ""}`.trim(),
-    kpis: s.kpis.map(({ key, label, value, prevValue, changePct, format }) => ({ key, label, value, prevValue, changePct, format })),
+    headline: `${s.headline} ${s.why && s.comparable ? s.why.description : ""}`.trim(),
+    kpis: s.kpis.map(({ key, label, value, prevValue, changePct, format, comparable }) => ({
+      key,
+      label,
+      value,
+      prevValue,
+      changePct,
+      format,
+      comparable,
+    })),
     findings: s.insights.map(({ title, description, impact }) => ({ title, description, impact })),
     anomalies: s.anomalies
       .filter((a) => a.severity !== "info")
@@ -107,8 +178,8 @@ export function buildReport(dataset: DemoDataset, filters: Filters, title?: stri
 export function keyFinding(dataset: DemoDataset, filters: Filters) {
   const s = summarize(dataset, filters);
   return {
-    keyInsight: s.why?.title ?? `매출 ${formatChange(s.revenue.changePct)}`,
-    revenueChangePct: +s.revenue.changePct.toFixed(1),
+    keyInsight: s.comparable ? (s.why?.title ?? `매출 ${formatChange(s.revenue.changePct)}`) : s.headline,
+    revenueChangePct: s.comparable ? +s.revenue.changePct.toFixed(1) : undefined,
     alertCount: s.anomalies.filter((a) => a.severity !== "info").length,
   };
 }

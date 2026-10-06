@@ -42,7 +42,7 @@ export default function AiQueryPage() {
     setInput("");
     setMessages((m) => [...m, { role: "user", text: q }]);
     setThinking(true);
-    const answer = await askDataQuestion(q, dataset.rows);
+    const answer = await askDataQuestion(q, dataset.rows, dataset.derived);
     setMessages((m) => [...m, { role: "ai", text: answer }]);
     setThinking(false);
   };
@@ -51,7 +51,7 @@ export default function AiQueryPage() {
     <>
       <PageHeader
         title="데이터 질의"
-        description={`${dataset.name}에 대해 자연어로 물어보세요. 데모에서는 최근 30일 데이터를 규칙 기반으로 계산해 답합니다.`}
+        description="최근 30일 데이터를 계산해 답합니다"
       />
 
       <div className="card flex flex-col">

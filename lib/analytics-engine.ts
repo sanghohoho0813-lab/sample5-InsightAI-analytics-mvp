@@ -150,8 +150,19 @@ function pctChange(cur: number, prev: number): number {
   return +(((cur - prev) / prev) * 100).toFixed(1);
 }
 
+/**
+ * 이전 기간과 비교할 수 있는지 — 현재 구간과 같은 길이의 직전 데이터가 있어야 한다.
+ * (예: 90일치 데이터에서 '최근 90일'을 고르면 비교할 이전 구간이 없다)
+ */
+export function isComparable(rows: DataRow[], filters: Filters): boolean {
+  const { currentDates, previousDates } = resolveDates(rows, filters);
+  return currentDates.length > 0 && previousDates.length === currentDates.length;
+}
+
 export function computeKpis(rows: DataRow[], filters: Filters): KpiResult[] {
   const { current, previous, currentDates } = applyFilters(rows, filters);
+  const comparable = isComparable(rows, filters);
+  const change = (cur: number, prev: number) => (comparable ? pctChange(cur, prev) : 0);
   const cur = totals(current);
   const prev = totals(previous);
   const daily = dailySeries(current, currentDates);
@@ -167,7 +178,8 @@ export function computeKpis(rows: DataRow[], filters: Filters): KpiResult[] {
       label: "총 매출",
       value: cur.revenue,
       prevValue: prev.revenue,
-      changePct: pctChange(cur.revenue, prev.revenue),
+      changePct: change(cur.revenue, prev.revenue),
+      comparable,
       format: "currency",
       spark: daily.map((d) => d.revenue),
     },
@@ -176,7 +188,8 @@ export function computeKpis(rows: DataRow[], filters: Filters): KpiResult[] {
       label: "주문 수",
       value: cur.orders,
       prevValue: prev.orders,
-      changePct: pctChange(cur.orders, prev.orders),
+      changePct: change(cur.orders, prev.orders),
+      comparable,
       format: "number",
       spark: daily.map((d) => d.orders),
     },
@@ -185,7 +198,8 @@ export function computeKpis(rows: DataRow[], filters: Filters): KpiResult[] {
       label: "고객 수",
       value: cur.customers,
       prevValue: prev.customers,
-      changePct: pctChange(cur.customers, prev.customers),
+      changePct: change(cur.customers, prev.customers),
+      comparable,
       format: "number",
       spark: daily.map((d) => d.customers),
     },
@@ -194,7 +208,8 @@ export function computeKpis(rows: DataRow[], filters: Filters): KpiResult[] {
       label: "전환율",
       value: +curConv.toFixed(2),
       prevValue: +prevConv.toFixed(2),
-      changePct: +(curConv - prevConv).toFixed(2), // %p
+      changePct: comparable ? +(curConv - prevConv).toFixed(2) : 0, // %p
+      comparable,
       format: "percent",
       spark: daily.map((d) => d.conversionRate),
     },
@@ -203,7 +218,8 @@ export function computeKpis(rows: DataRow[], filters: Filters): KpiResult[] {
       label: "평균 주문 금액",
       value: Math.round(curAov),
       prevValue: Math.round(prevAov),
-      changePct: pctChange(curAov, prevAov),
+      changePct: change(curAov, prevAov),
+      comparable,
       format: "currencyExact",
       spark: daily.map((d) => d.aov),
     },
@@ -214,12 +230,16 @@ export function computeKpis(rows: DataRow[], filters: Filters): KpiResult[] {
 export function trendSeries(rows: DataRow[], filters: Filters): DailyPoint[] {
   const { current, previous, currentDates, previousDates } = applyFilters(rows, filters);
   const cur = dailySeries(current, currentDates);
+  // 같은 길이의 이전 기간이 없으면 비교선을 그리지 않는다(일부만 겹친 비교선은 오해를 준다).
+  if (previousDates.length !== currentDates.length) return cur;
   const prev = dailySeries(previous, previousDates);
   return cur.map((p, i) => ({ ...p, prevRevenue: prev[i]?.revenue }));
 }
 
 export function channelShares(rows: DataRow[], filters: Filters): ChannelShare[] {
-  const { current, previous } = applyFilters(rows, { ...filters, channel: "all" });
+  const scoped = { ...filters, channel: "all" };
+  const { current, previous } = applyFilters(rows, scoped);
+  const comparable = isComparable(rows, scoped);
   const sum = new Map<string, number>();
   const prevSum = new Map<string, number>();
   for (const r of current) sum.set(r.channel, (sum.get(r.channel) ?? 0) + r.revenue);
@@ -230,7 +250,7 @@ export function channelShares(rows: DataRow[], filters: Filters): ChannelShare[]
     .map(([channel, revenue]) => {
       const share = total > 0 ? +((revenue / total) * 100).toFixed(1) : 0;
       const prevShare = ((prevSum.get(channel) ?? 0) / prevTotal) * 100;
-      return { channel, revenue, share, changePct: +(share - prevShare).toFixed(1) };
+      return { channel, revenue, share, changePct: comparable ? +(share - prevShare).toFixed(1) : 0 };
     })
     .sort((a, b) => b.revenue - a.revenue);
 }

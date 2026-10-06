@@ -9,14 +9,14 @@ export default function ToastStack() {
   if (toasts.length === 0) return null;
   return (
     <div
-      className="fixed inset-x-4 bottom-20 z-[90] flex flex-col items-end gap-2 sm:left-auto sm:right-6 sm:max-w-[420px] lg:bottom-6"
+      className="pointer-events-none fixed inset-x-4 top-16 z-[90] mx-auto flex max-w-[440px] flex-col items-center gap-2 lg:bottom-6 lg:left-[264px] lg:right-4 lg:top-auto"
       aria-live="polite"
     >
       {toasts.map((t) => (
         <div
           key={t.id}
           role="status"
-          className="card animate-fade-up flex w-full items-start gap-3 px-4 py-3 text-sub shadow-overlay"
+          className="card animate-fade-in pointer-events-auto flex w-full items-start gap-3 px-4 py-3 text-sub shadow-overlay"
         >
           {t.type === "success" && <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-positive" aria-hidden />}
           {t.type === "error" && <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-negative" aria-hidden />}

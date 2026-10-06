@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, ChevronUp } from "lucide-react";
-import { DataRow } from "@/lib/types";
+import { DataRow, DerivedField } from "@/lib/types";
 import { formatKRWExact, formatNumber } from "@/lib/format";
 
 const PAGE_SIZE = 10;
@@ -21,7 +21,29 @@ const COLUMNS: { key: SortKey; label: string; align: "left" | "right" }[] = [
 ];
 
 /** 데이터 미리보기 테이블 — 컬럼 정렬, 고정 헤더, 페이지네이션 */
-export default function DataTable({ rows }: { rows: DataRow[] }) {
+const CELL: Record<SortKey, (r: DataRow) => string> = {
+  date: (r) => r.date,
+  channel: (r) => r.channel,
+  product: (r) => r.product,
+  revenue: (r) => formatKRWExact(r.revenue),
+  orders: (r) => formatNumber(r.orders),
+  customers: (r) => formatNumber(r.customers),
+  conversionRate: (r) => `${r.conversionRate.toFixed(2)}%`,
+  aov: (r) => formatKRWExact(r.aov),
+};
+
+/** 각 열이 기대는 원본 필드 — 파일에 없던 필드의 열은 숨긴다(추정치를 원본처럼 보이지 않게) */
+const NEEDS: Partial<Record<SortKey, DerivedField[]>> = {
+  channel: ["channel"],
+  product: ["product"],
+  orders: ["orders"],
+  customers: ["customers"],
+  conversionRate: ["orders", "visitors"],
+  aov: ["orders"],
+};
+
+export default function DataTable({ rows, derived = [] }: { rows: DataRow[]; derived?: DerivedField[] }) {
+  const columns = COLUMNS.filter((c) => !(NEEDS[c.key] ?? []).some((f) => derived.includes(f)));
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "date", dir: "asc" });
 
@@ -50,10 +72,10 @@ export default function DataTable({ rows }: { rows: DataRow[] }) {
   return (
     <div>
       <div className="max-h-[480px] overflow-auto rounded-control border border-line">
-        <table className="w-full min-w-[880px] text-meta">
+        <table className="w-full text-meta" style={{ minWidth: columns.length * 110 }}>
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-line bg-surface-soft text-left text-caption text-ink-dim">
-              {COLUMNS.map((c) => {
+              {columns.map((c) => {
                 const active = sort.key === c.key;
                 const Icon = !active ? ChevronsUpDown : sort.dir === "asc" ? ChevronUp : ChevronDown;
                 return (
@@ -79,14 +101,16 @@ export default function DataTable({ rows }: { rows: DataRow[] }) {
                 key={`${r.date}-${r.channel}-${r.product}-${i}`}
                 className="border-b border-line/60 transition-colors last:border-0 hover:bg-surface-soft"
               >
-                <td className="tabular px-3 py-2.5 text-ink-soft">{r.date}</td>
-                <td className="px-3 py-2.5 text-ink">{r.channel}</td>
-                <td className="px-3 py-2.5 text-ink-soft">{r.product}</td>
-                <td className="tabular px-3 py-2.5 text-right font-semibold text-ink">{formatKRWExact(r.revenue)}</td>
-                <td className="tabular px-3 py-2.5 text-right text-ink">{formatNumber(r.orders)}</td>
-                <td className="tabular px-3 py-2.5 text-right text-ink">{formatNumber(r.customers)}</td>
-                <td className="tabular px-3 py-2.5 text-right text-ink">{r.conversionRate.toFixed(2)}%</td>
-                <td className="tabular px-3 py-2.5 text-right text-ink">{formatKRWExact(r.aov)}</td>
+                {columns.map((c) => (
+                  <td
+                    key={c.key}
+                    className={`px-3 py-2.5 ${c.align === "right" ? "tabular text-right" : ""} ${
+                      c.key === "revenue" ? "font-semibold text-ink" : c.key === "date" || c.key === "product" ? "tabular text-ink-soft" : "text-ink"
+                    }`}
+                  >
+                    {CELL[c.key](r)}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>

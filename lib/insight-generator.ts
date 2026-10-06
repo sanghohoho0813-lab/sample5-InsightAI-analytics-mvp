@@ -1,6 +1,7 @@
-import { applyFilters, channelShares, dailySeries, exploreSeries, resolveDates, uniqueDates } from "./analytics-engine";
+import { applyFilters, channelShares, dailySeries, exploreSeries, isComparable, resolveDates, uniqueDates } from "./analytics-engine";
 import { formatKRW, formatKRWExact } from "./format";
-import { DataRow, Filters, Insight, Recommendation } from "./types";
+import { computeForecasts, FORECAST_MIN_DAYS } from "./forecast-engine";
+import { DataRow, DerivedField, Filters, Insight, Recommendation } from "./types";
 
 export const DEFAULT_FILTERS: Filters = {
   preset: "30",
@@ -12,23 +13,27 @@ export const DEFAULT_FILTERS: Filters = {
 interface Context {
   rows: DataRow[];
   filters: Filters;
+  /** 업로드 파일에서 추정으로 채운 필드 — 이 값에 기대는 인사이트는 만들지 않는다 */
+  derived?: DerivedField[];
 }
 
 /** 데이터에서 계산된 값 기반으로 규칙형 인사이트를 생성한다. (LLM 연결 시 이 결과를 프롬프트 컨텍스트로 사용) */
-export function generateInsights({ rows, filters }: Context): Insight[] {
+export function generateInsights({ rows, filters, derived = [] }: Context): Insight[] {
   const insights: Insight[] = [];
   const shares = channelShares(rows, filters);
   const { current, currentDates } = applyFilters(rows, filters);
+  const comparable = isComparable(rows, filters);
+  const estimated = (f: DerivedField) => derived.includes(f);
 
-  // 1) 매출 상승/하락 요인: 비중 변화가 가장 큰 채널
+  // 1) 매출 상승/하락 요인: 비중 변화가 가장 큰 채널 (채널이 2개 이상이고 이전 기간이 있을 때)
   const mover = [...shares].sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct))[0];
-  if (mover && Math.abs(mover.changePct) >= 0.5) {
+  if (comparable && shares.length > 1 && mover && Math.abs(mover.changePct) >= 0.5) {
     const up = mover.changePct > 0;
     insights.push({
       id: "channel-mix",
       category: up ? "매출 상승 요인" : "채널 변화",
       title: `${mover.channel} 채널 비중 ${up ? "확대" : "축소"}`,
-      description: `${mover.channel} 채널의 매출 비중이 전 기간 대비 ${Math.abs(mover.changePct).toFixed(1)}%p ${up ? "증가" : "감소"}했습니다.`,
+      description: `${mover.channel} 채널의 매출 비중이 이전 기간보다 ${Math.abs(mover.changePct).toFixed(1)}%p ${up ? "증가" : "감소"}했습니다.`,
       detail: `현재 ${mover.channel} 채널은 전체 매출의 ${mover.share.toFixed(1)}%(${formatKRW(mover.revenue)})를 차지합니다. ${up ? "해당 채널의 전환 흐름이 개선되고 있어 예산 확대를 검토할 만합니다." : "유입 또는 전환 단계에서 이탈 요인을 점검해보세요."}`,
       impact: up ? "positive" : "negative",
       drill: { channel: mover.channel, metric: "revenue" },
@@ -52,7 +57,8 @@ export function generateInsights({ rows, filters }: Context): Insight[] {
   };
   const retAov = wavg(withShare.filter((x) => x.share > medShare));
   const newAov = wavg(withShare.filter((x) => x.share <= medShare));
-  if (newAov > 0 && retAov > 0 && Math.abs(((retAov - newAov) / newAov) * 100) >= 5) {
+  const hasCustomerData = !estimated("customers") && !estimated("returningCustomers") && !estimated("orders");
+  if (hasCustomerData && newAov > 0 && retAov > 0 && Math.abs(((retAov - newAov) / newAov) * 100) >= 5) {
     const diff = ((retAov - newAov) / newAov) * 100;
     insights.push({
       id: "customer-behavior",
@@ -105,7 +111,7 @@ export function generateInsights({ rows, filters }: Context): Insight[] {
     .sort((a, b) => b.pct - a.pct);
   const topProduct = productGrowth[0];
   const growthLabel = `최근 ${half}일`;
-  if (topProduct && topProduct.pct > 5) {
+  if (growth.size > 1 && topProduct && topProduct.pct > 5) {
     insights.push({
       id: "product-growth",
       category: "제품 인사이트",
@@ -123,7 +129,7 @@ export function generateInsights({ rows, filters }: Context): Insight[] {
   const convA = daily.slice(0, mid).reduce((a, p) => a + p.conversionRate, 0) / Math.max(1, mid);
   const convB = daily.slice(mid).reduce((a, p) => a + p.conversionRate, 0) / Math.max(1, daily.length - mid);
   const convDelta = convA > 0 ? ((convB - convA) / convA) * 100 : 0;
-  if (Math.abs(convDelta) >= 3) {
+  if (!estimated("visitors") && !estimated("orders") && daily.length >= 6 && Math.abs(convDelta) >= 3) {
     insights.push({
       id: "conversion-trend",
       category: "전환 추세",
@@ -183,7 +189,9 @@ export function generateRecommendations(ctx: Context): Recommendation[] {
       priority: "high",
     });
   }
-  if (recs.length < 3) {
+  // 고객 데이터가 실제로 있을 때만 일반 리텐션 제안을 덧붙인다.
+  const hasCustomers = !(ctx.derived ?? []).some((f) => f === "customers" || f === "returningCustomers");
+  if (recs.length < 3 && hasCustomers) {
     recs.push({
       id: "rec-retention",
       title: "리텐션 캠페인 준비",
@@ -196,67 +204,82 @@ export function generateRecommendations(ctx: Context): Recommendation[] {
 }
 
 /** 자연어 질의 데모 엔진: 질문 키워드를 해석해 실제 데이터를 계산해 답한다. */
-export function answerDataQuestion(question: string, rows: DataRow[]): string {
+export function answerDataQuestion(question: string, rows: DataRow[], derived: DerivedField[] = []): string {
   const q = question.toLowerCase();
   const filters = DEFAULT_FILTERS;
   const shares = channelShares(rows, filters);
-  const { current, previous } = applyFilters(rows, filters);
+  const { current, previous, currentDates } = applyFilters(rows, filters);
+  const comparable = isComparable(rows, filters);
+  const span = `최근 ${currentDates.length}일`;
   const curRev = current.reduce((a, r) => a + r.revenue, 0);
   const prevRev = previous.reduce((a, r) => a + r.revenue, 0);
+  const noCompare = "이전 같은 기간의 데이터가 없어 증감은 비교할 수 없습니다.";
 
   if (/(잘\s*팔|인기|베스트|많이\s*팔)/.test(q) || (q.includes("상품") && q.includes("최고"))) {
-    const top = exploreSeries(rows, filters, "revenue", "product")[0];
-    return top
-      ? `최근 30일 기준 가장 잘 팔린 상품은 '${top.name}'입니다. 해당 상품 매출은 ${formatKRW(top.value)}로 전체 상품 중 1위입니다.`
-      : "상품 데이터가 충분하지 않습니다.";
+    const ranked = exploreSeries(rows, filters, "revenue", "product");
+    if (ranked.length < 2) return "상품 구분이 없는 데이터라 상품별 순위를 계산할 수 없습니다.";
+    const top = ranked[0];
+    const share = (top.value / ranked.reduce((a, r) => a + r.value, 0)) * 100;
+    return `${span} 기준 가장 잘 팔린 상품은 '${top.name}'입니다. 매출 ${formatKRW(top.value)}로 전체의 ${share.toFixed(0)}%를 차지합니다.`;
   }
   if (/(광고|roas|효율)/.test(q)) {
+    if (derived.includes("adSpend")) return "광고비 컬럼이 없는 데이터라 광고 효율을 계산할 수 없습니다.";
     const roas = shares
       .filter((s) => s.channel !== "기타")
       .map((s) => {
         const ad = current.filter((r) => r.channel === s.channel).reduce((a, r) => a + r.adSpend, 0);
         return { channel: s.channel, roas: ad > 0 ? s.revenue / ad : 0 };
       })
+      .filter((s) => s.roas > 0)
       .sort((a, b) => b.roas - a.roas)[0];
     return roas
-      ? `광고 효율(ROAS)이 가장 높은 채널은 ${roas.channel}입니다. 최근 30일 광고비 대비 ${roas.roas.toFixed(1)}배의 매출을 만들었습니다.`
+      ? `광고 효율(ROAS)이 가장 높은 채널은 ${roas.channel}입니다. ${span} 광고비 대비 ${roas.roas.toFixed(1)}배의 매출을 만들었습니다.`
       : "광고비 데이터가 없어 효율을 계산할 수 없습니다.";
   }
   if (/(재구매|리텐션|단골)/.test(q)) {
-    const curRet = current.reduce((a, r) => a + r.returningCustomers, 0);
-    const curAll = current.reduce((a, r) => a + r.customers, 0);
-    const prevRet = previous.reduce((a, r) => a + r.returningCustomers, 0);
-    const prevAll = previous.reduce((a, r) => a + r.customers, 0);
-    const curRate = curAll > 0 ? (curRet / curAll) * 100 : 0;
-    const prevRate = prevAll > 0 ? (prevRet / prevAll) * 100 : 0;
-    return `최근 30일 재구매 고객 비중은 ${curRate.toFixed(1)}%로, 이전 30일(${prevRate.toFixed(1)}%) 대비 ${(curRate - prevRate).toFixed(1)}%p ${curRate >= prevRate ? "상승" : "하락"}했습니다.`;
+    if (derived.includes("returningCustomers") || derived.includes("customers"))
+      return "재구매 고객 컬럼이 없는 데이터라 재구매율을 계산할 수 없습니다.";
+    const rate = (list: DataRow[]) => {
+      const ret = list.reduce((a, r) => a + r.returningCustomers, 0);
+      const all = list.reduce((a, r) => a + r.customers, 0);
+      return all > 0 ? (ret / all) * 100 : 0;
+    };
+    const curRate = rate(current);
+    if (!comparable) return `${span} 재구매 고객 비중은 ${curRate.toFixed(1)}%입니다. ${noCompare}`;
+    const prevRate = rate(previous);
+    return `${span} 재구매 고객 비중은 ${curRate.toFixed(1)}%로, 이전 같은 기간(${prevRate.toFixed(1)}%)보다 ${Math.abs(curRate - prevRate).toFixed(1)}%p ${curRate >= prevRate ? "올랐습니다" : "내렸습니다"}.`;
   }
   if (/(다음\s*주|예상|예측|전망)/.test(q)) {
-    const dates = uniqueDates(rows);
-    const daily = dailySeries(rows, dates);
-    const recent = daily.slice(-14).reduce((a, p) => a + p.revenue, 0) / 14;
-    const prev14 = daily.slice(-28, -14).reduce((a, p) => a + p.revenue, 0) / 14;
-    const g = prev14 > 0 ? (recent - prev14) / prev14 : 0;
-    const next7 = recent * 7 * (1 + Math.max(-0.15, Math.min(0.2, g / 2)));
-    return `최근 14일 추세를 반영하면 다음 7일 매출은 약 ${formatKRW(next7)} 수준으로 예상됩니다. 최근 2주 일평균 매출이 직전 2주 대비 ${(g * 100).toFixed(1)}% ${g >= 0 ? "증가" : "감소"}한 흐름을 반영한 수치입니다.`;
+    // 예측 화면과 같은 모델을 써서 숫자가 어긋나지 않게 한다.
+    const f = computeForecasts(rows)[0];
+    if (!f) return `예측하려면 최소 ${FORECAST_MIN_DAYS}일치 데이터가 필요합니다. 지금 데이터는 ${uniqueDates(rows).length}일치입니다.`;
+    return `다음 7일 매출은 약 ${formatKRW(f.next7Total)}로 예상됩니다. 직전 7일보다 ${Math.abs(f.changePct).toFixed(1)}% ${f.changePct >= 0 ? "많은" : "적은"} 수준이며, 최근 14일 추세를 반영한 단순 모델의 추정치입니다.`;
   }
   if (/(떨어|하락|감소|왜)/.test(q) && /(매출|주문)/.test(q)) {
-    const drop = [...shares].sort((a, b) => a.changePct - b.changePct)[0];
+    if (!comparable) return `${span} 매출은 ${formatKRW(curRev)}입니다. ${noCompare}`;
     const totalDelta = prevRev > 0 ? ((curRev - prevRev) / prevRev) * 100 : 0;
+    const drop = shares.length > 1 ? [...shares].sort((a, b) => a.changePct - b.changePct)[0] : null;
     if (totalDelta >= 0) {
-      return `최근 30일 매출은 이전 기간 대비 ${totalDelta.toFixed(1)}% 증가해 하락 구간은 아닙니다. 다만 ${drop?.channel ?? "일부"} 채널의 비중이 ${Math.abs(drop?.changePct ?? 0).toFixed(1)}%p 줄어 해당 채널의 유입·전환 점검을 권장합니다.`;
+      return `${span} 매출은 이전 같은 기간보다 ${totalDelta.toFixed(1)}% 늘어 하락 구간은 아닙니다.${
+        drop && drop.changePct < 0 ? ` 다만 ${drop.channel} 채널의 비중이 ${Math.abs(drop.changePct).toFixed(1)}%p 줄어 유입·전환 점검을 권합니다.` : ""
+      }`;
     }
-    return `최근 30일 매출은 이전 기간 대비 ${Math.abs(totalDelta).toFixed(1)}% 감소했습니다. 가장 큰 요인은 ${drop?.channel ?? "주요"} 채널의 매출 비중 하락(${Math.abs(drop?.changePct ?? 0).toFixed(1)}%p)으로, 해당 채널의 신규 고객 전환율 감소가 영향을 준 것으로 보입니다.`;
+    return `${span} 매출은 이전 같은 기간보다 ${Math.abs(totalDelta).toFixed(1)}% 줄었습니다.${
+      drop ? ` 비중이 가장 많이 줄어든 채널은 ${drop.channel}(${Math.abs(drop.changePct).toFixed(1)}%p)입니다.` : ""
+    }`;
   }
   if (/(채널|비중)/.test(q)) {
+    if (shares.length < 2) return "채널 구분이 없는 데이터라 채널별 비중을 계산할 수 없습니다.";
     const top = shares[0];
-    return top
-      ? `최근 30일 기준 매출 비중이 가장 큰 채널은 ${top.channel}(${top.share.toFixed(1)}%)입니다. 전 기간 대비 비중이 ${Math.abs(top.changePct).toFixed(1)}%p ${top.changePct >= 0 ? "증가" : "감소"}했습니다.`
-      : "채널 데이터가 없습니다.";
+    return `${span} 매출 비중이 가장 큰 채널은 ${top.channel}(${top.share.toFixed(1)}%)입니다.${
+      comparable ? ` 이전 같은 기간보다 비중이 ${Math.abs(top.changePct).toFixed(1)}%p ${top.changePct >= 0 ? "늘었습니다" : "줄었습니다"}.` : ""
+    }`;
   }
   // 기본 요약 응답
   const delta = prevRev > 0 ? ((curRev - prevRev) / prevRev) * 100 : 0;
-  return `최근 30일 매출은 ${formatKRW(curRev)}로 이전 기간 대비 ${Math.abs(delta).toFixed(1)}% ${delta >= 0 ? "증가" : "감소"}했습니다. 자세한 내용은 "가장 잘 팔린 상품은?", "광고 효율이 가장 높은 채널은?"처럼 질문해보세요.`;
+  return `${span} 매출은 ${formatKRW(curRev)}${
+    comparable ? `로 이전 같은 기간보다 ${Math.abs(delta).toFixed(1)}% ${delta >= 0 ? "늘었습니다" : "줄었습니다"}` : "입니다"
+  }. "가장 잘 팔린 상품은?", "광고 효율이 가장 높은 채널은?"처럼 물어보세요.`;
 }
 
 export const SUGGESTED_QUESTIONS = [

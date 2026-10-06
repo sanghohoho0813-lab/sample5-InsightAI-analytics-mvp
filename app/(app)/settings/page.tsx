@@ -6,7 +6,8 @@ import PageSkeleton from "@/components/PageSkeleton";
 import { Panel, PanelHeader } from "@/components/Panel";
 import { useApp } from "@/lib/store";
 import { BRAND } from "@/lib/brand";
-import { btn, field } from "@/lib/ui";
+import { btn } from "@/lib/ui";
+import Select from "@/components/Select";
 import { AppSettings } from "@/lib/types";
 
 function Row({ label, desc, children }: { label: string; desc?: string; children: React.ReactNode }) {
@@ -35,19 +36,20 @@ export default function SettingsPage() {
         <PanelHeader title="분석" />
         <div className="mt-2 divide-y divide-line">
           <Row label="기본 분석 기간" desc="새 분석을 열거나 범위를 초기화할 때 적용됩니다. 바꾸면 지금 화면에도 바로 반영됩니다.">
-            <select
+            <Select
+              label="기본 분석 기간"
               value={settings.defaultPreset}
-              onChange={(e) => {
-                updateSettings({ defaultPreset: e.target.value as AppSettings["defaultPreset"] });
+              onChange={(v) => {
+                updateSettings({ defaultPreset: v as AppSettings["defaultPreset"] });
                 showToast("기본 분석 기간을 저장했습니다.", "success");
               }}
-              aria-label="기본 분석 기간"
-              className={field}
-            >
-              <option value="7">최근 7일</option>
-              <option value="30">최근 30일</option>
-              <option value="90">최근 90일</option>
-            </select>
+              className="w-[160px]"
+              options={[
+                { value: "7", label: "최근 7일" },
+                { value: "30", label: "최근 30일" },
+                { value: "90", label: "최근 90일" },
+              ]}
+            />
           </Row>
           <Row
             label="분석 엔진"

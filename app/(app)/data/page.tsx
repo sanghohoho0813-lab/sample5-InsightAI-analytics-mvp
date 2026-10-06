@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import UploadPanel from "@/components/UploadPanel";
@@ -32,7 +33,7 @@ export default function DataPage() {
     <>
       <PageHeader
         title="데이터"
-        description="분석할 데이터를 올리거나 샘플 데이터를 고릅니다. 분석 기록에서 이전 분석을 다시 열 수 있습니다."
+        description="파일을 올리거나 샘플을 골라 분석합니다"
       />
 
       {dataset && (
@@ -54,7 +55,7 @@ export default function DataPage() {
           </div>
           {showPreview && (
             <div className="mt-5">
-              <DataTable rows={dataset.rows} />
+              <DataTable rows={dataset.rows} derived={dataset.derived} />
             </div>
           )}
         </Panel>
@@ -81,13 +82,19 @@ export default function DataPage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-body font-semibold text-ink">
                         {ds.name}
-                        {active && <span className="ml-2 text-caption font-semibold text-brand">분석 중</span>}
+                        {active && <span className="ml-2 text-caption font-semibold text-brand">보는 중</span>}
                       </p>
-                      <p className="mt-1 text-meta text-ink-soft">{ds.description}</p>
+                      <p className="mt-1 line-clamp-2 text-meta text-ink-soft">{ds.description}</p>
                     </div>
-                    <button onClick={() => startAnalysis(ds)} className={btn.secondary}>
-                      {active ? "다시 분석" : "분석하기"}
-                    </button>
+                    {active ? (
+                      <Link href="/dashboard" className={btn.secondary}>
+                        대시보드
+                      </Link>
+                    ) : (
+                      <button onClick={() => startAnalysis(ds)} className={btn.secondary}>
+                        분석하기
+                      </button>
+                    )}
                   </li>
                 );
               })}

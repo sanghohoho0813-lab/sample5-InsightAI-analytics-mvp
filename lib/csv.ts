@@ -1,4 +1,4 @@
-import { DataRow } from "./types";
+import { DataRow, DerivedField } from "./types";
 
 /** 간단한 CSV 파서 (따옴표/쉼표 이스케이프 지원) */
 export function parseCsv(text: string): string[][] {
@@ -72,6 +72,10 @@ export interface ParseResult {
   columns: string[];
   rowCount: number;
   error?: string;
+  /** 파일에 없어 추정으로 채운 필드 */
+  derived?: DerivedField[];
+  /** 날짜를 읽지 못해 건너뛴 행 수 */
+  skipped?: number;
 }
 
 /** 헤더 별칭 매핑으로 업로드 데이터를 표준 DataRow로 변환 */
@@ -90,14 +94,19 @@ export function toDataRows(table: string[][]): ParseResult {
   if (idx.date == null || idx.revenue == null) {
     return {
       rows: [], columns: header, rowCount: table.length - 1,
-      error: "필수 컬럼(Date, Revenue)을 찾을 수 없습니다. 파일 구조를 확인해주세요.",
+      error: "날짜·매출 컬럼을 찾지 못했습니다. 첫 줄의 헤더 이름을 확인해주세요(예: Date, Revenue 또는 날짜, 매출).",
     };
   }
 
   const rows: DataRow[] = [];
+  let skipped = 0;
   for (const raw of table.slice(1)) {
+    if (raw.every((c) => !String(c ?? "").trim())) continue; // 빈 줄
     const date = normalizeDate(raw[idx.date] ?? "");
-    if (!date) continue;
+    if (!date) {
+      skipped++;
+      continue;
+    }
     const revenue = num(raw[idx.revenue!]);
     const orders = idx.orders != null ? Math.max(1, num(raw[idx.orders])) : Math.max(1, Math.round(revenue / 60000));
     const visitors = idx.visitors != null ? Math.max(orders, num(raw[idx.visitors])) : orders * 25;
@@ -122,7 +131,10 @@ export function toDataRows(table: string[][]): ParseResult {
     return { rows: [], columns: header, rowCount: 0, error: "유효한 날짜 형식(YYYY-MM-DD)의 행을 찾지 못했습니다." };
   }
   rows.sort((a, b) => a.date.localeCompare(b.date));
-  return { rows, columns: header, rowCount: rows.length };
+  const derived = (["orders", "visitors", "customers", "returningCustomers", "adSpend", "channel", "product"] as DerivedField[]).filter(
+    (k) => idx[k] == null
+  );
+  return { rows, columns: header, rowCount: rows.length, derived, skipped };
 }
 
 export async function parseFile(file: File): Promise<ParseResult> {

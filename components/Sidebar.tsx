@@ -60,15 +60,11 @@ export default function Sidebar() {
       </nav>
 
       <div className="border-t border-nav-line px-5 py-4">
-        <p className="text-caption text-nav-dim">분석 중인 데이터</p>
-        <Link href="/data" className="mt-1 block truncate text-sub font-semibold text-white hover:underline">
-          {dataset?.name ?? "데이터 선택"}
-        </Link>
         <a
           href={BRAND.links.home}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 flex items-center gap-2 text-caption text-nav-dim transition-colors hover:text-nav-text"
+          className="flex items-center gap-2 text-caption text-nav-dim transition-colors hover:text-nav-text"
         >
           <span className="rounded bg-white px-1 py-0.5">
             <MiraeSymbol height={14} />

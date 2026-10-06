@@ -8,7 +8,8 @@ import EmptyState from "@/components/EmptyState";
 import AnomalyList from "@/components/AnomalyList";
 import { Panel } from "@/components/Panel";
 import { useApp } from "@/lib/store";
-import { detectAnomalies } from "@/lib/anomaly-engine";
+import { ANOMALY_MIN_DAYS } from "@/lib/anomaly-engine";
+import { anomaliesFor } from "@/lib/dataset-meta";
 import { recentAlerts } from "@/lib/notifications";
 import { Severity } from "@/lib/types";
 import { SEVERITY_META, btn } from "@/lib/ui";
@@ -19,7 +20,7 @@ export default function AnomaliesPage() {
   const { ready, dataset, filters, readIds, markRead } = useApp();
   const [tab, setTab] = useState<Tab>("all");
 
-  const anomalies = useMemo(() => (dataset ? detectAnomalies(dataset.rows, filters) : []), [dataset, filters]);
+  const anomalies = useMemo(() => (dataset ? anomaliesFor(dataset, filters) : []), [dataset, filters]);
   const read = useMemo(() => new Set(readIds), [readIds]);
   // '새로움'은 확인이 필요한 등급(위험·주의)에만 단다.
   const unreadIds = useMemo(
@@ -57,7 +58,9 @@ export default function AnomaliesPage() {
         title="이상 감지"
         description={
           anomalies.length === 0
-            ? "이 범위에서는 감지된 변화가 없습니다."
+            ? new Set(dataset.rows.map((r) => r.date)).size < ANOMALY_MIN_DAYS
+              ? `급증·급감을 찾으려면 ${ANOMALY_MIN_DAYS}일 이상의 데이터가 필요합니다.`
+              : "이 범위에서는 감지된 변화가 없습니다."
             : `${anomalies.length}건 감지 · 위험 ${counts.critical}건, 주의 ${counts.warning}건${unreadIds.size ? ` · 미확인 ${unreadIds.size}건` : ""}`
         }
         actions={
@@ -96,7 +99,7 @@ export default function AnomaliesPage() {
       </Panel>
 
       <p className="mt-4 text-meta text-ink-dim">
-        감지 규칙(데모): 전일 대비 ±30% 이상 변화, 또는 최근 7일 평균 대비 ±2 표준편차 이탈. 채널 단위까지 검사해 원인 채널을 표시합니다.
+        감지 기준: 전일 대비 ±30% 이상, 또는 직전 7일 평균에서 크게 벗어난 날. 같은 날 함께 움직인 지표는 한 건으로 묶고, 급감 직후의 반등은 따로 알리지 않습니다.
       </p>
     </>
   );

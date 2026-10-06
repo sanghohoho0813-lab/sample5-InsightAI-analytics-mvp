@@ -13,10 +13,13 @@ import RevenueTrendChart from "@/components/charts/RevenueTrendChart";
 import ChartTooltip from "@/components/charts/ChartTooltip";
 import { useApp } from "@/lib/store";
 import { computeKpis, exploreSeries, trendSeries } from "@/lib/analytics-engine";
-import { formatKRW, formatNumber } from "@/lib/format";
+import { formatAxisKRW, formatKRW, formatNumber } from "@/lib/format";
 import { COLORS } from "@/lib/palette";
-import { MetricKey } from "@/lib/types";
-import { field } from "@/lib/ui";
+import { DerivedField, MetricKey } from "@/lib/types";
+import { availableKpis, canSplit } from "@/lib/dataset-meta";
+import { comparisonLabel } from "@/lib/report";
+import Select from "@/components/Select";
+import { DemoDataset } from "@/lib/types";
 
 type BreakMetric = "revenue" | "orders" | "customers" | "conversionRate" | "adSpend";
 type Dimension = "channel" | "product" | "customerType";
@@ -35,17 +38,41 @@ const DIMENSIONS: { value: Dimension; label: string }[] = [
 ];
 const METRIC_KEYS: MetricKey[] = ["revenue", "orders", "customers", "conversion", "aov"];
 
+/** 분해 지표·차원 중 이 데이터로 실제 계산할 수 있는 것만 */
+const NEEDS: Record<BreakMetric, DerivedField[]> = {
+  revenue: [],
+  orders: ["orders"],
+  customers: ["customers"],
+  conversionRate: ["orders", "visitors"],
+  adSpend: ["adSpend"],
+};
+function usableMetrics(ds: DemoDataset) {
+  return BREAK_METRICS.filter((m) => !NEEDS[m.value].some((f) => ds.derived?.includes(f)));
+}
+function usableDims(ds: DemoDataset) {
+  return DIMENSIONS.filter((d) =>
+    d.value === "customerType"
+      ? !ds.derived?.includes("customers") && !ds.derived?.includes("returningCustomers")
+      : canSplit(ds, d.value)
+  );
+}
+
 function AnalyticsView() {
   const params = useSearchParams();
   const { ready, dataset, filters, setFilters } = useApp();
   const initial = params.get("metric") as MetricKey | null;
-  const [metric, setMetric] = useState<MetricKey>(initial && METRIC_KEYS.includes(initial) ? initial : "revenue");
-  const [dimension, setDimension] = useState<Dimension>("channel");
-  const [breakMetric, setBreakMetric] = useState<BreakMetric>("revenue");
+  const [picked, setPicked] = useState<MetricKey>(initial && METRIC_KEYS.includes(initial) ? initial : "revenue");
+  const [dimChoice, setDimension] = useState<Dimension>("channel");
+  const [metricChoice, setBreakMetric] = useState<BreakMetric>("revenue");
+  const dims = dataset ? usableDims(dataset) : [];
+  const metrics = dataset ? usableMetrics(dataset) : BREAK_METRICS;
+  // 데이터를 바꿔 선택지가 사라졌으면 쓸 수 있는 첫 항목으로 돌아간다.
+  const dimension = dims.some((d) => d.value === dimChoice) ? dimChoice : (dims[0]?.value ?? "channel");
+  const breakMetric = metrics.some((m) => m.value === metricChoice) ? metricChoice : "revenue";
 
   // 인사이트·이상치에서 다른 지표로 다시 들어오면 그 지표를 연다.
   useEffect(() => {
-    if (initial && METRIC_KEYS.includes(initial)) setMetric(initial);
+    if (initial && METRIC_KEYS.includes(initial)) setPicked(initial);
   }, [initial]);
 
   const data = useMemo(() => {
@@ -54,7 +81,7 @@ function AnalyticsView() {
     const breakFilters =
       dimension === "channel" ? { ...filters, channel: "all" } : dimension === "product" ? { ...filters, product: "all" } : filters;
     return {
-      kpis: computeKpis(dataset.rows, filters),
+      kpis: availableKpis(computeKpis(dataset.rows, filters), dataset),
       trend: trendSeries(dataset.rows, filters),
       breakdown: exploreSeries(dataset.rows, breakFilters, breakMetric, dimension),
     };
@@ -70,6 +97,7 @@ function AnalyticsView() {
     );
   }
 
+  const metric = data.kpis.some((k) => k.key === picked) ? picked : "revenue";
   const isPct = breakMetric === "conversionRate";
   const isMoney = breakMetric === "revenue" || breakMetric === "adSpend";
   const fmt = (v: number) => (isPct ? `${v.toFixed(2)}%` : isMoney ? formatKRW(v) : formatNumber(v));
@@ -89,16 +117,17 @@ function AnalyticsView() {
     <>
       <PageHeader
         title="분석"
-        description="지표를 고르면 추이가 바뀌고, 채널·상품 막대를 누르면 그 항목으로 범위가 좁혀집니다."
+        description={comparisonLabel(dataset, filters)}
       />
       <FilterToolbar dataset={dataset} />
 
-      <KpiStrip kpis={data.kpis} selected={metric} onSelect={setMetric} />
+      <KpiStrip kpis={data.kpis} selected={metric} onSelect={setPicked} />
 
       <div className="mt-6">
         <RevenueTrendChart points={data.trend} metric={metric} />
       </div>
 
+      {dims.length > 0 && (
       <Panel className="mt-6" aria-labelledby="breakdown-title">
         <PanelHeader
           id="breakdown-title"
@@ -115,7 +144,7 @@ function AnalyticsView() {
           action={
             <div className="flex flex-wrap gap-2">
               <div className="flex rounded-control border border-line bg-surface-soft p-0.5" role="group" aria-label="분해 기준">
-                {DIMENSIONS.map((d) => (
+                {dims.map((d) => (
                   <button
                     key={d.value}
                     onClick={() => setDimension(d.value)}
@@ -128,16 +157,13 @@ function AnalyticsView() {
                   </button>
                 ))}
               </div>
-              <select
+              <Select
+                label="분해 지표"
                 value={breakMetric}
-                onChange={(e) => setBreakMetric(e.target.value as BreakMetric)}
-                aria-label="분해 지표"
-                className={field}
-              >
-                {BREAK_METRICS.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
+                onChange={(v) => setBreakMetric(v as BreakMetric)}
+                options={metrics}
+                className="w-[132px]"
+              />
             </div>
           }
         />
@@ -152,7 +178,7 @@ function AnalyticsView() {
                   <CartesianGrid stroke={COLORS.grid} horizontal={false} />
                   <XAxis
                     type="number"
-                    tickFormatter={(v: number) => (isPct ? `${v}%` : isMoney ? formatKRW(v).replace("₩", "") : formatNumber(v))}
+                    tickFormatter={(v: number) => (isPct ? `${v}%` : isMoney ? formatAxisKRW(v) : formatNumber(v))}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -216,6 +242,7 @@ function AnalyticsView() {
           </div>
         )}
       </Panel>
+      )}
     </>
   );
 }

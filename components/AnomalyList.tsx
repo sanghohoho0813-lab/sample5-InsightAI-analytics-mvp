@@ -48,8 +48,13 @@ export default function AnomalyList({
               <span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${s.dot}`} aria-hidden />
               <span className="min-w-0 flex-1">
                 <span className="flex items-start justify-between gap-3">
-                  <span className="text-body font-semibold text-ink">
+                  <span
+                    className={`text-body ${
+                      !unreadIds ? "font-semibold text-ink" : unread ? "font-bold text-ink" : "font-medium text-ink-soft"
+                    }`}
+                  >
                     {a.title}
+                    {unread && <span className="sr-only"> (미확인)</span>}
                   </span>
                   <span className={`tabular shrink-0 text-body font-bold ${a.deltaPct >= 0 ? "text-positive" : "text-negative"}`}>
                     {a.deltaPct >= 0 ? "+" : ""}
@@ -62,12 +67,7 @@ export default function AnomalyList({
                   <span className="tabular">{formatDateKR(a.date)}</span>
                   <span aria-hidden>·</span>
                   <span>{a.metric}</span>
-                  {unread && (
-                    <>
-                      <span aria-hidden>·</span>
-                      <span className="font-semibold text-brand">미확인</span>
-                    </>
-                  )}
+
                 </span>
               </span>
               <ChevronDown
@@ -83,7 +83,7 @@ export default function AnomalyList({
                   onClick={() => toMoment(a.date, a.channel, a.metricKey)}
                   className="mt-2 inline-flex min-h-11 items-center text-sub font-semibold text-brand hover:text-brand-dark"
                 >
-                  이 시점 전후 분석 보기 →
+                  그날 전후 분석 보기 →
                 </button>
               </div>
             )}

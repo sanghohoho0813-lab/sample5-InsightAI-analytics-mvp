@@ -10,6 +10,8 @@ import { InsightList, RecommendationList } from "@/components/InsightList";
 import { Panel, PanelHeader } from "@/components/Panel";
 import { useApp } from "@/lib/store";
 import { generateInsights, generateRecommendations } from "@/lib/insight-generator";
+import { insightContext } from "@/lib/dataset-meta";
+import { comparisonLabel } from "@/lib/report";
 import { btn } from "@/lib/ui";
 
 export default function InsightsPage() {
@@ -17,7 +19,7 @@ export default function InsightsPage() {
 
   const data = useMemo(() => {
     if (!dataset) return null;
-    const ctx = { rows: dataset.rows, filters };
+    const ctx = insightContext(dataset, filters);
     return { insights: generateInsights(ctx), recommendations: generateRecommendations(ctx) };
   }, [dataset, filters]);
 
@@ -35,13 +37,13 @@ export default function InsightsPage() {
     <>
       <PageHeader
         title="인사이트"
-        description="무엇이 왜 변했는지, 그리고 다음에 무엇을 하면 좋을지 정리했습니다. 수치는 모두 선택한 범위의 데이터에서 계산합니다."
+        description={comparisonLabel(dataset, filters)}
       />
       <FilterToolbar dataset={dataset} />
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <Panel>
-          <PanelHeader title="발견한 변화" description={`${data.insights.length}건 · 규칙 기반 분석`} />
+          <PanelHeader title="발견한 변화" description={`${data.insights.length}건`} />
           <div className="mt-2">
             <InsightList insights={data.insights} />
           </div>

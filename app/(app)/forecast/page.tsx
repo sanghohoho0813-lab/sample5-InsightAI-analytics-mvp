@@ -9,7 +9,9 @@ import { Panel } from "@/components/Panel";
 import ForecastChart from "@/components/charts/ForecastChart";
 import { filterDimensions } from "@/lib/analytics-engine";
 import { useApp } from "@/lib/store";
-import { computeForecasts } from "@/lib/forecast-engine";
+import { computeForecasts, FORECAST_MIN_DAYS } from "@/lib/forecast-engine";
+import Link from "next/link";
+import { btn } from "@/lib/ui";
 import { formatKRW, formatNumber } from "@/lib/format";
 import { ForecastSummary } from "@/lib/types";
 
@@ -23,11 +25,28 @@ export default function ForecastPage() {
   );
 
   if (!ready) return <PageSkeleton />;
-  if (!dataset || forecasts.length === 0) {
+  if (!dataset) {
     return (
       <>
         <PageHeader title="예측" />
         <EmptyState />
+      </>
+    );
+  }
+  if (forecasts.length === 0) {
+    const days = new Set(dataset.rows.map((r) => r.date)).size;
+    return (
+      <>
+        <PageHeader title="예측" />
+        <Panel className="px-6 py-12 text-center">
+          <p className="text-card font-bold text-ink">예측하려면 {FORECAST_MIN_DAYS}일 이상의 데이터가 필요합니다</p>
+          <p className="mt-2 text-sub text-ink-soft">
+            지금 데이터는 {days}일치입니다. 최근 7일과 그 앞 7일을 비교해 추세를 잡기 때문입니다.
+          </p>
+          <Link href="/data" className={`${btn.secondary} mt-6`}>
+            다른 데이터 고르기
+          </Link>
+        </Panel>
       </>
     );
   }
@@ -42,7 +61,7 @@ export default function ForecastPage() {
     <>
       <PageHeader
         title="예측"
-        description="최근 14일 이동평균과 추세를 반영한 다음 7일 추정치입니다. 채널·상품 범위를 바꾸면 그 범위로 다시 계산합니다."
+        description="최근 14일 추세로 계산한 다음 7일 추정치"
       />
       <FilterToolbar dataset={dataset} showPeriod={false} />
 
@@ -85,7 +104,7 @@ export default function ForecastPage() {
                 <span className="h-[3px] w-4 rounded-full bg-brand" aria-hidden /> 실측
               </li>
               <li className="flex items-center gap-2">
-                <span className="h-[3px] w-4 rounded-full bg-accent" aria-hidden /> 예측
+                <span className="h-0 w-4 border-t-2 border-dashed border-accent" aria-hidden /> 예측
               </li>
               <li className="flex items-center gap-2">
                 <span className="h-2.5 w-4 rounded-sm bg-accent/15" aria-hidden /> 예상 범위
@@ -97,8 +116,7 @@ export default function ForecastPage() {
       </Panel>
 
       <p className="mt-4 text-meta text-ink-dim">
-        데모 예측 모델입니다. 프로모션·시즌 요인은 반영하지 않으며, 예상 범위는 최근 변동성으로 계산합니다. 실제 서비스에서는
-        계절성 모델이나 외부 변수를 함께 쓰도록 확장할 수 있습니다.
+        단순 추세 모델의 추정치입니다. 프로모션·시즌 요인은 반영하지 않으며, 예상 범위는 최근 변동폭으로 계산합니다.
       </p>
     </>
   );

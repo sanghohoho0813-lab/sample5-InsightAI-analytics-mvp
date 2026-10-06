@@ -23,7 +23,11 @@ export interface DemoDataset {
   channels: string[];
   products: string[];
   periodLabel: string;
+  /** 업로드 파일에 없어 다른 값으로 추정한 필드 — 추정치로 만든 지표는 화면에 내지 않는다 */
+  derived?: DerivedField[];
 }
+
+export type DerivedField = "orders" | "visitors" | "customers" | "returningCustomers" | "adSpend" | "channel" | "product";
 
 export interface KpiResult {
   key: string;
@@ -34,6 +38,8 @@ export interface KpiResult {
   format: "currency" | "number" | "percent" | "currencyExact";
   spark: number[]; // 일별 미니 스파크라인
   invert?: boolean; // true면 감소가 긍정
+  /** 같은 길이의 이전 기간 데이터가 있어 증감을 계산할 수 있는지 */
+  comparable: boolean;
 }
 
 export interface DailyPoint {
@@ -140,7 +146,7 @@ export interface SavedReport {
   signature: string;
   scope: { start: string; end: string; days: number; channel: string; product: string };
   headline: string;
-  kpis: { key: string; label: string; value: number; prevValue: number; changePct: number; format: KpiResult["format"] }[];
+  kpis: { key: string; label: string; value: number; prevValue: number; changePct: number; format: KpiResult["format"]; comparable?: boolean }[];
   findings: { title: string; description: string; impact: Insight["impact"] }[];
   anomalies: { title: string; description: string; severity: Severity; date: string }[];
   forecasts: { label: string; next7Total: number; changePct: number; format: "currency" | "number" }[];

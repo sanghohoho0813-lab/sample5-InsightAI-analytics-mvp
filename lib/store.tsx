@@ -35,6 +35,10 @@ interface AppState {
   deleteReport: (id: string) => void;
   updateSettings: (s: Partial<AppSettings>) => void;
   resetDemo: () => void;
+  /** 브라우저에 보관된 업로드 파일(최근 3개) */
+  uploads: DemoDataset[];
+  /** 분석 과정 없이 다른 데이터셋으로 바로 전환 (헤더 데이터 선택) */
+  switchDataset: (ds: DemoDataset) => void;
   showToast: (message: string, type?: ToastMsg["type"], action?: ToastMsg["action"]) => void;
   dismissToast: (id: number) => void;
   markRead: (ids: string[]) => void;
@@ -115,6 +119,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [readIds, setReadIds] = useState<string[]>([]);
+  const [uploads, setUploads] = useState<DemoDataset[]>([]);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -124,6 +129,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHistory(readJson<AnalysisRecord[]>(KEYS.history, []));
     setReports(readJson<SavedReport[]>(KEYS.reports, []));
     setReadIds(readJson<string[]>(KEYS.read, []));
+    setUploads(readJson<DemoDataset[]>(KEYS.uploads, []));
     const active = readJson<{ id?: string } | null>(KEYS.active, null);
     const restored = active?.id ? findDataset(active.id) : null;
     // 어느 주소로 처음 들어와도 빈 화면이 아니도록 기본 샘플 데이터를 연결한다.
@@ -186,6 +192,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => {
           const isUpload = !ds.id.startsWith("demo-");
           const restorable = isUpload ? storeUpload(ds) : true;
+          if (isUpload) setUploads(readJson<DemoDataset[]>(KEYS.uploads, []));
           const nextFilters = filtersFor(settings.defaultPreset);
           activate(ds);
           setFiltersState(nextFilters);
@@ -274,6 +281,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [setPreset]
   );
 
+  const switchDataset = useCallback(
+    (ds: DemoDataset) => {
+      activate(ds);
+      setFiltersState(filtersFor(settings.defaultPreset));
+      showToast(`'${ds.name}'(으)로 바꿨습니다.`, "info");
+    },
+    [activate, settings.defaultPreset, showToast]
+  );
+
   const resetDemo = useCallback(() => {
     try {
       Object.keys(localStorage)
@@ -287,6 +303,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHistory([]);
     setReports([]);
     setReadIds([]);
+    setUploads([]);
     activate(getDemoDatasets()[0]);
     router.push("/dashboard");
     showToast("데모를 처음 상태로 되돌렸습니다.", "success");
@@ -314,13 +331,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteReport,
       updateSettings,
       resetDemo,
+      uploads,
+      switchDataset,
       showToast,
       dismissToast,
       markRead,
     }),
     [ready, dataset, analyzing, analysisStep, filters, settings, history, reports, toasts, readIds,
      setFilters, setPreset, setCustomRange, resetFilters, startAnalysis, openAnalysis, saveReport,
-     deleteReport, updateSettings, resetDemo, showToast, dismissToast, markRead]
+     deleteReport, updateSettings, resetDemo, uploads, switchDataset, showToast, dismissToast, markRead]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

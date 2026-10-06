@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { aggregateSeries } from "@/lib/analytics-engine";
-import { formatDateKR, formatDateShort, formatKRW, formatKRWExact, formatNumber } from "@/lib/format";
+import { formatAxisKRW, formatDateKR, formatDateShort, formatKRWExact, formatNumber } from "@/lib/format";
 import { DailyPoint } from "@/lib/types";
 import ChartTooltip from "./ChartTooltip";
 import { COLORS } from "@/lib/palette";
@@ -34,7 +34,7 @@ const METRIC_META: Record<
     key: "revenue",
     label: "매출",
     full: formatKRWExact,
-    axis: (v) => formatKRW(v).replace("₩", ""),
+    axis: (v) => formatAxisKRW(v),
   },
   orders: { key: "orders", label: "주문 수", full: (v) => `${formatNumber(v)}건`, axis: formatNumber },
   customers: { key: "customers", label: "고객 수", full: (v) => `${formatNumber(v)}명`, axis: formatNumber },
@@ -44,7 +44,7 @@ const METRIC_META: Record<
     full: (v) => `${v.toFixed(2)}%`,
     axis: (v) => `${v}%`,
   },
-  aov: { key: "aov", label: "평균 주문 금액", full: formatKRWExact, axis: (v) => formatKRW(v).replace("₩", "") },
+  aov: { key: "aov", label: "평균 주문 금액", full: formatKRWExact, axis: (v) => formatAxisKRW(v) },
 };
 
 /**
@@ -177,11 +177,16 @@ export default function RevenueTrendChart({
           <span className="font-bold text-ink">
             {unit === "month" ? selected.date.replace("-", ".") : formatDateKR(selected.date)}
           </span>
-          <span className="text-ink-soft">매출 <b className="text-ink">{formatKRWExact(selected.revenue)}</b></span>
-          <span className="text-ink-soft">주문 <b className="text-ink">{formatNumber(selected.orders)}건</b></span>
-          <span className="text-ink-soft">전환율 <b className="text-ink">{selected.conversionRate}%</b></span>
+          <span className="text-ink-soft">
+            {meta.label} <b className="text-ink">{meta.full(selected[meta.key] as number)}</b>
+          </span>
+          {metric !== "revenue" && (
+            <span className="text-ink-soft">
+              매출 <b className="text-ink">{formatKRWExact(selected.revenue)}</b>
+            </span>
+          )}
           {hasPrev && selected.prevRevenue != null && (
-            <span className="text-ink-soft">전 기간 <b className="text-ink">{formatKRWExact(selected.prevRevenue)}</b></span>
+            <span className="text-ink-soft">이전 기간 <b className="text-ink">{formatKRWExact(selected.prevRevenue)}</b></span>
           )}
           <button onClick={() => setSelected(null)} className="ml-auto min-h-9 font-semibold text-ink-soft hover:text-ink">
             닫기

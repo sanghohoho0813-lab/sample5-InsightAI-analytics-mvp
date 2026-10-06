@@ -3,7 +3,7 @@ import { DataRow, ForecastPoint, ForecastSummary } from "./types";
 
 /**
  * 데모 예측 로직: 최근 14일 이동평균 + 최근 성장률 기반 외삽.
- * 실제 ML 모델이 아닌 규칙 기반 추정이며, UI에서는 "AI Forecast(예상)"로 표기한다.
+ * 실제 ML 모델이 아닌 규칙 기반 추정이며, UI에서는 "단순 추세 모델 · 추정치"로 표기한다.
  */
 function forecastMetric(values: number[], dates: string[], horizon = 7) {
   // 최근 7일 수준을 기준으로, 직전 7일 대비 성장률을 일 단위로 완만하게 반영
@@ -37,8 +37,12 @@ function forecastMetric(values: number[], dates: string[], horizon = 7) {
   return { points, recentAvg, sd };
 }
 
+/** 예측에는 최근 7일과 직전 7일 비교가 필요하다. 이보다 짧으면 예측하지 않는다. */
+export const FORECAST_MIN_DAYS = 14;
+
 export function computeForecasts(rows: DataRow[], horizon = 7): ForecastSummary[] {
   const dates = uniqueDates(rows);
+  if (dates.length < FORECAST_MIN_DAYS) return [];
   const series = dailySeries(rows, dates);
   const historyDays = 21;
 

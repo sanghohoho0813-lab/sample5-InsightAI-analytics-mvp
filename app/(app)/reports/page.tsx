@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import EmptyState from "@/components/EmptyState";
+import FilterToolbar from "@/components/FilterToolbar";
 import { Panel, PanelHeader } from "@/components/Panel";
 import { useApp } from "@/lib/store";
 import { BRAND } from "@/lib/brand";
@@ -96,12 +97,16 @@ function ReportDetail({ report }: { report: SavedReport }) {
                   <tr key={k.key} className="border-b border-line/70 last:border-0">
                     <td className="py-3 text-ink">{k.label}</td>
                     <td className="tabular py-3 text-right font-semibold text-ink">{formatValue(k.value, k.format)}</td>
-                    <td className="tabular py-3 text-right text-ink-soft">{formatValue(k.prevValue, k.format)}</td>
-                    <td className={`tabular py-3 text-right font-semibold ${k.changePct >= 0 ? "text-positive" : "text-negative"}`}>
-                      {k.changePct >= 0 ? "+" : ""}
-                      {k.changePct.toFixed(k.key === "conversion" ? 2 : 1)}
-                      {k.key === "conversion" ? "%p" : "%"}
-                    </td>
+                    <td className="tabular py-3 text-right text-ink-soft">{k.comparable === false ? "–" : formatValue(k.prevValue, k.format)}</td>
+                    {k.comparable === false ? (
+                      <td className="py-3 text-right text-ink-dim">–</td>
+                    ) : (
+                      <td className={`tabular py-3 text-right font-semibold ${k.changePct >= 0 ? "text-positive" : "text-negative"}`}>
+                        {k.changePct >= 0 ? "+" : ""}
+                        {k.changePct.toFixed(k.key === "conversion" ? 2 : 1)}
+                        {k.key === "conversion" ? "%p" : "%"}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -111,6 +116,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
 
         <div className={section}>
           <h2 className={h}>주요 변화</h2>
+          {report.findings.length === 0 && <p className="mt-3 text-sub text-ink-soft">이 범위에서는 뚜렷한 변화가 없었습니다.</p>}
           <ol className="mt-3 space-y-4">
             {report.findings.map((f, i) => (
               <li key={i}>
@@ -139,6 +145,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
           )}
         </div>
 
+        {report.forecasts.length > 0 && (
         <div className={section}>
           <h2 className={h}>다음 7일 예측</h2>
           <p className="mt-1 text-meta text-ink-dim">최근 14일 추세 기반 단순 모델 · 추정치</p>
@@ -157,6 +164,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
             ))}
           </dl>
         </div>
+        )}
 
         <div className={section}>
           <h2 className={h}>실행 제안</h2>
@@ -199,15 +207,17 @@ function ReportLibrary() {
 
   return (
     <>
-      <PageHeader title="보고서" description="분석 결과를 저장해두고 다시 열거나 PDF로 내보냅니다. 저장한 보고서는 이 브라우저에 보관됩니다." />
+      <PageHeader title="보고서" description="저장한 분석 결과를 다시 열거나 PDF로 내보냅니다" />
 
       {dataset && scope ? (
+        <>
+        <FilterToolbar dataset={dataset} />
         <Panel className="p-5 md:p-6" aria-labelledby="new-report">
           <h2 id="new-report" className="text-card font-bold text-ink">
             새 보고서
           </h2>
           <p className="mt-1 text-sub text-ink-soft">
-            현재 범위 · <b className="font-semibold text-ink">{dataset.name}</b> · {scopeLabel(scope)}
+            <b className="font-semibold text-ink">{dataset.name}</b> · {scopeLabel(scope)}
           </p>
           <form
             onSubmit={(e) => {
@@ -225,7 +235,7 @@ function ReportLibrary() {
               onChange={(e) => setTitle(e.target.value)}
               placeholder="제목 (비워두면 자동으로 붙습니다)"
               maxLength={60}
-              className={`${field} flex-1`}
+              className={`${field} w-full sm:flex-1`}
             />
             <button type="submit" disabled={busy} className={btn.primary}>
               {busy ? "저장 중…" : "보고서 만들기"}
@@ -239,14 +249,19 @@ function ReportLibrary() {
               </Link>
             </p>
           )}
-          <p className="mt-3 text-meta text-ink-dim">범위는 대시보드·분석 화면의 기간·채널·상품 선택을 따릅니다.</p>
+
         </Panel>
+        </>
       ) : (
         <EmptyState />
       )}
 
       <Panel className="mt-6" aria-labelledby="saved-reports">
-        <PanelHeader id="saved-reports" title="저장한 보고서" description={`${reports.length}건 · 최신순`} />
+        <PanelHeader
+          id="saved-reports"
+          title="저장한 보고서"
+          description={reports.length ? `${reports.length}건 · 이 브라우저에 보관` : undefined}
+        />
         {reports.length === 0 ? (
           <p className="px-5 pb-8 pt-6 text-center text-sub text-ink-dim md:px-6">
             아직 저장한 보고서가 없습니다. 위에서 첫 보고서를 만들어보세요.
