@@ -63,7 +63,7 @@
 
 | 구분 | 토큰 |
 |---|---|
-| 색상 | 브랜드 블루 `brand #1478ff`(+dark/light/soft) · 보조 틸 `accent #0f9fb3`(예측·비교 시리즈 전용) · 뉴트럴(canvas/surface/line/ink/nav) · 상태 `positive / warning / negative` |
+| 색상 | 브랜드 블루 `brand #0a62db`(글자·버튼) / 로고 블루 `#1478ff`(차트 선) · 보조 틸 `accent #0f9fb3`(예측·비교 시리즈 전용) · 뉴트럴(canvas/surface/line/ink/nav) · 상태 `positive / warning / negative` — **모든 글자 색은 WCAG AA(4.5:1) 이상**, E2E에서 axe로 검사 |
 | 타입 스케일(360px 기준) | `caption 13` · `meta 14` · `sub 15` · `body 16` · `lead 17` · `card 18` · `title 22` · `page 28` · `kpi 28` · `display 40` — 768px 이상에서 `title 24 · page 32 · kpi 30 · display 52` |
 | 모서리 | `rounded-control 10` · `rounded-card 14` · `rounded-panel 20` |
 | 그림자 | `shadow-subtle` · `shadow-raised` · `shadow-overlay` |
@@ -115,11 +115,15 @@
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+cp .env.example .env.local   # 선택: 데이터 질의에 LLM을 쓰려면 ANTHROPIC_API_KEY 입력
+npm run dev                  # http://localhost:3000
+
+npm run check      # typecheck + lint + 단위 테스트 (커밋 전 기본)
 npm run build      # 프로덕션 빌드 (Vercel 배포 가능)
-npm run typecheck  # TypeScript
-npm run lint       # ESLint (next/core-web-vitals + next/typescript)
+npm run test:e2e   # 프로덕션 빌드를 띄워 데스크톱·모바일 E2E + 접근성 검사 (build 후 실행)
 ```
+
+로컬에 Playwright 브라우저 대신 시스템 Chromium을 쓰려면 `PLAYWRIGHT_CHROMIUM_PATH=/path/to/chrome npm run test:e2e`.
 
 ## 데모 데이터 스토리 (이커머스)
 
@@ -131,12 +135,62 @@ npm run lint       # ESLint (next/core-web-vitals + next/typescript)
 - 6일 전~오늘: 검색광고 전환율 개선, 객단가 상승
 - 최근 2주: '비타민 세럼' 판매 가속
 
-## 분석 엔진 · AI 구조
+## 개발자 가이드
 
-- `lib/analytics-engine.ts` 집계·비교 · `lib/anomaly-engine.ts` 이상치 · `lib/forecast-engine.ts` 예측 · `lib/insight-generator.ts` 인사이트·제안·질의 응답
-- `lib/report.ts` — 대시보드 요약(`summarize`, 기여도 분석 포함)과 보고서 스냅샷(`buildReport`)을 같은 계산으로 만듭니다.
-- `lib/dataset-meta.ts` — 데이터셋에서 실제로 계산 가능한 지표·차원을 판정합니다(추정 필드 제외).
-- `lib/ai.ts` — 서버에 `AI_API_KEY`가 있으면 `/api/ai`로 LLM을 호출하고, 없으면 규칙 기반 엔진으로 답합니다.
+### 구조와 데이터 흐름
+
+```
+demo-data / csv(업로드)          ← 원본 행(DataRow) — 브라우저 밖으로 나가지 않음
+        │
+        ▼
+analytics-engine  (기간 해석 · 집계 · 이전 기간 비교 가능 여부)
+anomaly-engine    (규칙 탐지 → 원인 채널 · 지표 묶기 · 반등/제자리 억제)
+forecast-engine   (14일 추세 → 7일 추정)
+insight-generator (인사이트 · 실행 제안 · 규칙 기반 질의 응답)
+        │
+        ▼
+report.summarize  (답 → 이유(기여도) → 확인할 것 → 다음 행동)  ── 대시보드 · 보고서 스냅샷 · 분석 기록이 같은 함수를 쓴다
+dataset-meta      (파일에 없어 추정한 필드에 기대는 지표·인사이트를 걸러냄)
+        │
+        ▼
+store (React Context)  ←→  persist (localStorage: 검증된 읽기 · 용량 초과 대응)
+        │
+        ▼
+화면 (app/(app)/*)      ai/client → /api/ai (선택) → Claude API
+```
+
+- **엔진은 순수 함수**입니다. React·브라우저에 의존하지 않아 단위 테스트로 규칙을 고정합니다.
+- **화면의 모든 숫자는 한 계산 경로**에서 나옵니다. 대시보드 요약, 저장 보고서, 분석 기록, LLM에 보내는 데이터 요약이 `summarize`·`buildAiContext`를 공유해 서로 어긋나지 않습니다.
+- **상태 경계**: 범위(기간·채널·상품)는 전역 상태이고, 드릴다운은 출발 화면과 이전 범위를 `drill`로 기억해 돌아갈 때(링크·브라우저 뒤로) 복원합니다(`components/DrillWatcher.tsx`).
+
+### 데이터 질의 (LLM, 선택)
+
+- 브라우저는 `/api/ai`만 호출하고 키는 서버(`ANTHROPIC_API_KEY`)에만 둡니다. 모델은 `AI_MODEL`(기본 `claude-opus-5-5`).
+- 원본 행이 아니라 **화면과 같은 계산으로 만든 요약**(`lib/ai/context.ts`, 12KB 이하)만 보내고, 시스템 프롬프트로 "요약 안의 숫자만 근거로, 없는 값은 모른다고" 답하게 합니다. 질문은 `<question>` 태그로 분리해 지시 주입을 막습니다.
+- 요청·응답 형식은 `lib/ai/contract.ts` 한곳에서 정의하고 서버·클라이언트가 같은 검증을 씁니다(질문 300자, 요약 크기 제한).
+- 키 없음·거절(`refusal`)·호출 실패·20초 초과 시 규칙 기반 엔진으로 자연스럽게 넘어가고, 답변마다 출처(`AI 답변` / `규칙 기반 답변`)를 표시합니다.
+- 인스턴스 단위 호출 제한(IP당 분당 20회). 여러 인스턴스에서 공유하려면 외부 저장소로 옮깁니다.
+
+### 테스트
+
+| 종류 | 위치 | 다루는 것 |
+|---|---|---|
+| 단위 (Vitest) | `tests/unit` | 기간 비교 규칙, 이상치 묶기·억제, 기여도 분석, 예측 최소 일수, CSV·XLSX 파싱(별칭·한글 날짜·엑셀 날짜 셀), 저장소 검증·용량 초과, AI 요청 검증, `/api/ai` 라우트(SDK 모킹: 프롬프트 구성·거절·오류·호출 제한) |
+| E2E (Playwright) | `tests/e2e` | 데스크톱·모바일 각각: 첫 방문, 드릴다운 후 범위 복원, 90일 비교 불가, 보고서 저장·새로고침·이름 변경·삭제 되돌리기, 업로드 정상·오류 4종, 404·리다이렉트·손상된 저장 데이터 |
+| 품질 (axe + 레이아웃) | `tests/e2e/quality.spec.ts` | 11개 화면 × 2개 뷰포트에서 WCAG 2.1 AA 심각·치명 위반 0건, 가로 넘침 0 |
+
+테스트 데이터는 `tests/unit/fixtures.ts`의 결정적 생성기로 만들어, 각 테스트가 의도한 변화(특정 날·채널 급감 등)만 담습니다.
+
+### CI
+
+`.github/workflows/ci.yml` — 푸시·PR마다 typecheck → lint → 단위 테스트 → 빌드, 이어서 E2E(데스크톱·모바일·접근성). 실패 시 Playwright trace를 아티팩트로 남깁니다.
+
+### 설계상 선택
+
+- **규칙 기반이 기본**: 같은 데이터면 언제나 같은 결과가 나오고 설명 가능해야 하므로, 판단(탐지·요인·제안)은 규칙으로 하고 LLM은 "질문에 자연어로 답하기"에만 씁니다.
+- **추정치는 숨긴다**: 업로드 파일에 없는 컬럼은 계산 편의상 추정으로 채우지만, 그 값에 기대는 지표·인사이트·표 열·질의 답변은 내보내지 않습니다.
+- **비교는 같은 길이일 때만**: 이전 구간이 모자라면 증감 대신 "비교 없음" — 가짜 +100%를 만들지 않습니다.
+- **보안 헤더**: `nosniff`, `Referrer-Policy`, `Permissions-Policy`, 틀(iframe) 허용은 자기 자신과 miraeailab.com으로 제한.
 
 ## 데이터 구조 (Supabase)
 
@@ -152,8 +206,11 @@ components/     PageHeader, Panel, FilterToolbar, ScopeSheet, DatasetSwitcher, S
                 Sidebar, TopBar, MobileNav, DateLine, DateRangePicker, DataTable, UploadPanel,
                 AnalysisOverlay, ToastStack, EmptyState, PageSkeleton, AppFooter,
                 SampleBridgeCTA, MiraeLogo, Logo, charts/
-lib/            store, report, dataset-meta, drill, nav, ui, use-popover, palette, brand, notifications,
-                analytics-engine, anomaly-engine, forecast-engine, insight-generator, ai, csv, demo-data
+lib/            analytics-engine, anomaly-engine, forecast-engine, insight-generator, report, dataset-meta,  ← 순수 계산
+                csv, demo-data, format, persist, store, drill, nav, ui, use-popover, palette, brand, notifications,
+                ai/ (contract · context · client)
+app/api/ai/     LLM 프록시 라우트
+tests/          unit/ (Vitest) · e2e/ (Playwright + axe)
 public/         brand/ 로고 · sample/insightai-sample.csv 업로드 예시
 supabase/       schema.sql
 ```
