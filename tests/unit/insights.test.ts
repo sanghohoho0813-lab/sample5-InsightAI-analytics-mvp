@@ -91,6 +91,23 @@ describe("generateRecommendations — 발견에서 나온 할 일", () => {
     expect(first.link).toMatchObject({ kind: "anomaly" });
   });
 
+  it("매장(…점)이 줄었으면 온라인 유입 경로 대신 매장 운영을 확인하라고 한다", () => {
+    const rows = makeRows({
+      days: 60,
+      channels: ["강남점", "홍대점"],
+      mul: (_d, ch, _p, i) => (i >= 30 ? (ch === "강남점" ? 1.5 : 0.8) : 1),
+    });
+    const rec = generateRecommendations({ rows, filters: f("30") }).find((r) => r.title === "홍대점 매출 감소 원인 점검")!;
+    expect(rec.description).toMatch(/매장 운영/);
+    expect(rec.description).not.toMatch(/광고·검색 노출/);
+  });
+
+  it("캠페인처럼 재고가 없는 항목은 재고 대신 예산·노출을 확인하라고 한다", () => {
+    const rows = makeRows({ days: 40, products: ["신규 캠페인", "재구매 캠페인"], mul: (_d, _c, p, i) => (i >= 33 && p === "재구매 캠페인" ? 1.4 : 1) });
+    const rec = generateRecommendations({ rows, filters: f("30") }).find((r) => r.id === "rec-stock")!;
+    expect(rec.title).toBe("'재구매 캠페인' 예산과 노출 유지");
+  });
+
   it("늘어나는 상품은 최근 7일 판매량을 근거로 재고 확보를 제안한다", () => {
     const rows = makeRows({ days: 40, mul: (_d, _c, p, i) => (i >= 33 && p === "B" ? 1.4 : 1) });
     const rec = generateRecommendations({ rows, filters: f("30") }).find((r) => r.id === "rec-stock")!;

@@ -20,7 +20,7 @@ export interface Diagnosis {
 
 const deltaOf = (a: Anomaly, key: MetricId) => a.metrics.find((m) => m.key === key)?.deltaPct;
 /** 채널 이름이 '…점'이면 오프라인 매장으로 본다 */
-const isStore = (name?: string) => !!name && /점$/.test(name);
+export const isStore = (name?: string) => !!name && /점$/.test(name);
 
 /**
  * 이상치에 함께 움직인 지표 조합으로 원인 유형을 고른다.

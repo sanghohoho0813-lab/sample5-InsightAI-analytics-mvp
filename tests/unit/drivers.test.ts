@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   adEfficiency,
+  adsOf,
+  adSpendOf,
   contributions,
   decompose,
   dominantFactor,
@@ -106,6 +108,13 @@ describe("halfTrend · signed", () => {
   it("기간을 반으로 나눠 비교한다", () => {
     const rows = makeRows({ days: 20, mul: (_d, _c, _p, i) => (i >= 10 ? 1.5 : 1) });
     expect(halfTrend(rows, f("30"))?.pct).toBeCloseTo(50, 5);
+  });
+
+  it("채널 이름이 '…광고'면 '광고'를 겹쳐 쓰지 않는다", () => {
+    expect(adSpendOf("SNS 광고")).toBe("SNS 광고비");
+    expect(adSpendOf("스마트스토어")).toBe("스마트스토어 광고비");
+    expect(adsOf("검색 광고")).toBe("검색 광고");
+    expect(adsOf("웹")).toBe("웹 광고");
   });
 
   it("0은 부호 없이 쓴다", () => {

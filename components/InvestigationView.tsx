@@ -239,7 +239,8 @@ export default function InvestigationView({ anomaly, from }: { anomaly: Anomaly;
             ))}
           </ol>
           <p className="mt-4 rounded-control bg-surface-soft px-4 py-3 text-meta text-ink-soft">
-            실제 원인은 그날의 운영 기록(광고 집행, 배포, 재고, 매장 운영)으로 확인하세요. 확인한 내용은 보고서로 저장해 두면 다음 달 비교에 쓸 수 있습니다.
+            실제 원인은 그날의 운영 기록(광고 집행, 배포, 재고, 매장 운영)으로 확인하세요. 대시보드의 &lsquo;보고서로 저장&rsquo;으로 이 기간의 결론을 남겨 두면
+            다음 달과 비교할 수 있습니다.
           </p>
         </Step>
       </div>

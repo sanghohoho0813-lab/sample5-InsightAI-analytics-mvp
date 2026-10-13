@@ -1,7 +1,7 @@
 import { applyFilters, exploreSeries, filterDimensions, isComparable, resolveDates, uniqueDates } from "./analytics-engine";
 import { summarize } from "./briefing";
 import { canSplit, insightContext } from "./dataset-meta";
-import { adEfficiency, contributions, pctChange, productMomentum, signed, signedKRW, sumRows } from "./drivers";
+import { adEfficiency, adSpendOf, contributions, pctChange, productMomentum, signed, signedKRW, sumRows } from "./drivers";
 import { computeForecasts, FORECAST_MIN_DAYS } from "./forecast-engine";
 import { formatKRW, formatMonthDay, formatNumber, josa } from "./format";
 import { factorPhrase, segmentFactors } from "./insight-generator";
@@ -104,7 +104,7 @@ export function answerQuestion(question: string, ds: DemoDataset, filters: Filte
     if (focus) {
       const enough = focus.ordersPct >= focus.adPct - 15;
       return {
-        text: `${focus.channel} 광고비는 이전 같은 기간보다 ${signed(focus.adPct)}, 주문은 ${signed(focus.ordersPct)} 변했습니다. ${
+        text: `${adSpendOf(focus.channel)}는 이전 같은 기간보다 ${signed(focus.adPct)}, 주문은 ${signed(focus.ordersPct)} 변했습니다. ${
           enough ? "광고비 증감만큼 주문도 따라 움직였습니다." : "광고비가 늘어난 만큼 주문이 늘지 않았습니다."
         } 광고비 1원당 매출은 ${focus.roasPrev.toFixed(1)}원 → ${focus.roasCur.toFixed(1)}원입니다.`,
         evidence: [
@@ -265,7 +265,7 @@ export function suggestedQuestions(ds: DemoDataset, filters: Filters): Suggestio
   else if (canSplit(ds, "product")) out.push({ question: "가장 잘 팔린 상품은?", hint: "상품 순위" });
   if (!derived.includes("adSpend") && b.comparable) {
     const weak = b.insights.find((i) => i.id === "ad-weak");
-    out.push({ question: weak?.drill?.channel ? `${weak.drill.channel} 광고비는 효과가 있었어?` : "광고 효율이 가장 높은 채널은?", hint: "광고 효율" });
+    out.push({ question: weak?.drill?.channel ? `${adSpendOf(weak.drill.channel)}는 효과가 있었어?` : "광고 효율이 가장 높은 채널은?", hint: "광고 효율" });
   }
   out.push({ question: "지금 가장 먼저 확인할 일은?", hint: "위험·할 일" });
   if (uniqueDates(rows).length >= FORECAST_MIN_DAYS) out.push({ question: "다음 7일 매출은 어떻게 될까?", hint: "추정" });

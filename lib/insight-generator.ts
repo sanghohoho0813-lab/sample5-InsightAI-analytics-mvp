@@ -15,10 +15,12 @@ import {
   signedKRW,
   sumRows,
   weakAdSpend,
+  adSpendOf,
+  adsOf,
 } from "./drivers";
 import { formatKRW, formatMonthDay, formatNumber, josa } from "./format";
 import { urgency } from "./anomaly-engine";
-import { diagnose } from "./investigate";
+import { diagnose, isStore } from "./investigate";
 import { Anomaly, DataRow, DerivedField, DrillTarget, Filters, Insight, MetricKey, Recommendation } from "./types";
 
 export interface Context {
@@ -183,7 +185,7 @@ export function generateInsights(ctx: Context): Insight[] {
     insights.push({
       id: "ad-weak",
       category: "광고 효율",
-      title: `${weak.channel} 광고비는 ${weak.adPct.toFixed(0)}% 늘었지만 주문은 ${
+      title: `${adSpendOf(weak.channel)}는 ${weak.adPct.toFixed(0)}% 늘었지만 주문은 ${
         weak.ordersPct >= 0 ? `${weak.ordersPct.toFixed(0)}% 증가에 그쳤습니다` : `오히려 ${Math.abs(weak.ordersPct).toFixed(0)}% 줄었습니다`
       }`,
       description: `광고비 ${formatKRW(weak.adPrev)} → ${formatKRW(weak.adCur)}(${signedKRW(weak.adCur - weak.adPrev)}). 광고비 1원당 매출이 ${weak.roasPrev.toFixed(1)}원에서 ${weak.roasCur.toFixed(1)}원으로 낮아졌습니다.`,
@@ -285,6 +287,17 @@ const CHECK_BY_FACTOR: Record<FactorChange["key"], string> = {
   aov: "할인·쿠폰 적용률과 고가 상품의 판매 비중이 바뀌었는지 확인하세요.",
   orders: "판매 채널의 노출 위치와 재고 상태가 바뀌었는지 확인하세요.",
 };
+/** 오프라인 매장(…점)은 온라인 유입 경로 대신 매장 운영 기준으로 말한다 */
+const STORE_CHECK: Partial<Record<FactorChange["key"], string>> = {
+  visitors: "매장 운영(영업시간·인력)과 주변 상황(행사·공사·날씨) 중 방문객에 영향을 준 변화가 있었는지 확인하세요.",
+  conversion: "결제 대기·품절·가격 변경처럼 방문객이 구매하지 않고 나간 이유가 있었는지 확인하세요.",
+};
+const STORE_KEEP: Partial<Record<FactorChange["key"], string>> = {
+  visitors: "방문객을 늘린 요인(프로모션·주변 행사·운영 시간 변화)을 기록하고, 다른 매장에도 적용할 수 있는지 검토하세요.",
+};
+const checkFor = (name: string, key: FactorChange["key"]) => (isStore(name) && STORE_CHECK[key]) || CHECK_BY_FACTOR[key];
+const keepFor = (name: string, key: FactorChange["key"]) => (isStore(name) && STORE_KEEP[key]) || KEEP_BY_FACTOR[key];
+
 const KEEP_BY_FACTOR: Record<FactorChange["key"], string> = {
   visitors: "방문자를 늘린 유입 경로(광고·검색·제휴)의 예산과 노출을 유지하세요.",
   conversion: "최근 바꾼 상세페이지·결제 흐름·광고 문구를 기록하고 다른 채널에도 적용할 수 있는지 검토하세요.",
@@ -327,7 +340,7 @@ export function generateRecommendations(ctx: Context, anomalies: Anomaly[] = [])
     recs.push({
       id: `rec-${id}`,
       title: `${name} 매출 감소 원인 점검`,
-      description: dom ? CHECK_BY_FACTOR[dom.key] : CHECK_BY_FACTOR.orders,
+      description: checkFor(name, dom?.key ?? "orders"),
       evidence: ins.title,
       priority: "high",
       link: { kind: "segment", ...ins.drill },
@@ -339,7 +352,7 @@ export function generateRecommendations(ctx: Context, anomalies: Anomaly[] = [])
   if (weak?.drill?.channel) {
     recs.push({
       id: "rec-ad-weak",
-      title: `${weak.drill.channel} 광고 증액분 성과 점검`,
+      title: `${adsOf(weak.drill.channel)} 증액분 성과 점검`,
       description: "늘린 캠페인·키워드별 주문 전환을 확인하고, 주문이 따라오지 않은 집행은 이전 수준으로 되돌리세요.",
       evidence: weak.title,
       priority: "high",
@@ -351,11 +364,15 @@ export function generateRecommendations(ctx: Context, anomalies: Anomaly[] = [])
   const rising = byId("product-rising");
   if (rising?.drill?.product) {
     const m = productMomentum(ctx.rows, ctx.filters, ctx.derived).find((x) => x.product === rising.drill!.product);
+    // 캠페인·프로모션처럼 재고가 없는 항목은 예산·노출 기준으로 말한다.
+    const campaign = /캠페인|프로모션|광고/.test(rising.drill.product);
+    const pace = m && m.unit === "orders" ? `지금 속도라면 다음 7일에 약 ${formatNumber(m.recentOrders)}건입니다(최근 7일 기준 추정). ` : "";
     recs.push({
       id: "rec-stock",
-      title: `'${rising.drill.product}' 재고와 노출 확보`,
-      description:
-        m && m.unit === "orders"
+      title: campaign ? `'${rising.drill.product}' 예산과 노출 유지` : `'${rising.drill.product}' 재고와 노출 확보`,
+      description: campaign
+        ? `${pace}성과가 빨라진 만큼 예산이 일찍 소진되지 않는지, 노출 위치가 유지되는지 확인하세요.`
+        : m && m.unit === "orders"
           ? `지금 속도라면 다음 7일에 약 ${formatNumber(m.recentOrders)}건이 팔립니다(최근 7일 기준 추정). 재고가 그만큼 있는지 확인하세요.`
           : "판매 속도가 빨라졌습니다. 품절되지 않게 재고를 확인하고 노출 위치를 유지하세요.",
       evidence: rising.title,
@@ -384,7 +401,7 @@ export function generateRecommendations(ctx: Context, anomalies: Anomaly[] = [])
       recs.push({
         id: "rec-keep",
         title: `${name}의 ${factorPhrase(dom)} 요인 유지`,
-        description: KEEP_BY_FACTOR[dom.key],
+        description: keepFor(name, dom.key),
         evidence: `${driver.title} (${dom.label} ${signed(dom.pct)})`,
         priority: "medium",
         link: { kind: "segment", ...driver.drill, metric: FACTOR_METRIC[dom.key] },

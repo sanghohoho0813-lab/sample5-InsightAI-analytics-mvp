@@ -242,6 +242,11 @@ export function adEfficiency(rows: DataRow[], filters: Filters, derived: Derived
     .filter((a) => a.adPrev > 0 && a.adCur > 0);
 }
 
+/** "스마트스토어 광고비" · 채널 이름이 이미 '…광고'면 "SNS 광고비" */
+export const adSpendOf = (channel: string) => (channel.endsWith("광고") ? `${channel}비` : `${channel} 광고비`);
+/** "스마트스토어 광고" · "SNS 광고" */
+export const adsOf = (channel: string) => (channel.endsWith("광고") ? channel : `${channel} 광고`);
+
 /** 광고비가 늘어난 만큼 주문이 늘지 않은 채널 — 광고비 +15% 이상, 주문 증가율과 15%p 이상 차이 */
 export function weakAdSpend(list: AdEfficiency[]): AdEfficiency | null {
   return (
