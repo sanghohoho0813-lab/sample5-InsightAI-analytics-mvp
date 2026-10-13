@@ -16,10 +16,14 @@ export interface Shape {
   mul?: (date: string, channel: string, product: string, dayIndex: number) => number;
   /** 날짜·채널별 방문자 배수 (전환율 변화 시나리오용) */
   visitorMul?: (date: string, channel: string, dayIndex: number) => number;
+  /** 날짜·채널별 광고비 배수 (광고 효율 시나리오용) */
+  adMul?: (date: string, channel: string, dayIndex: number) => number;
+  /** 날짜·채널별 객단가 배수 */
+  aovMul?: (date: string, channel: string, dayIndex: number) => number;
 }
 
 /** 잡음 없는 결정적 데이터 — 테스트가 의도한 변화만 들어간다. */
-export function makeRows({ days, channels = ["웹", "앱"], products = ["A", "B"], mul, visitorMul }: Shape): DataRow[] {
+export function makeRows({ days, channels = ["웹", "앱"], products = ["A", "B"], mul, visitorMul, adMul, aovMul }: Shape): DataRow[] {
   const rows: DataRow[] = [];
   for (let i = 0; i < days; i++) {
     const date = isoDaysBefore(END, days - 1 - i);
@@ -28,7 +32,8 @@ export function makeRows({ days, channels = ["웹", "앱"], products = ["A", "B"
         const m = mul?.(date, channel, product, i) ?? 1;
         const vm = visitorMul?.(date, channel, i) ?? 1;
         const orders = Math.round(100 * m);
-        const revenue = orders * 50_000;
+        const aov = 50_000 * (aovMul?.(date, channel, i) ?? 1);
+        const revenue = Math.round(orders * aov);
         const visitors = Math.round(2500 * m * vm);
         const customers = Math.round(orders * 0.9);
         const returning = Math.round(customers * 0.4);
@@ -43,8 +48,8 @@ export function makeRows({ days, channels = ["웹", "앱"], products = ["A", "B"
           newCustomers: customers - returning,
           returningCustomers: returning,
           conversionRate: +((orders / visitors) * 100).toFixed(2),
-          aov: 50_000,
-          adSpend: revenue * 0.1,
+          aov: Math.round(aov),
+          adSpend: revenue * 0.1 * (adMul?.(date, channel, i) ?? 1),
         });
       }
     }

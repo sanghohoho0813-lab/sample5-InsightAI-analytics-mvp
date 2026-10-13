@@ -12,10 +12,11 @@ import { Panel, PanelHeader } from "@/components/Panel";
 import { useApp } from "@/lib/store";
 import { findDataset } from "@/lib/persist";
 import { BRAND } from "@/lib/brand";
-import { reportSignature, scopeLabel, scopeOf } from "@/lib/report";
-import { formatKRW, formatNumber, formatValue } from "@/lib/format";
+import { reportSignature, scopeLabel, scopeOf, summarize } from "@/lib/report";
+import { formatDateKR, formatKRW, formatNumber, formatValue } from "@/lib/format";
 import { SavedReport } from "@/lib/types";
 import { SEVERITY_META, btn, field } from "@/lib/ui";
+import { PRIORITY } from "@/components/BriefingPanel";
 
 const DATETIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
 
@@ -28,6 +29,9 @@ function ReportDetail({ report }: { report: SavedReport }) {
 
   const section = "border-t border-line px-5 py-6 md:px-8";
   const h = "text-card font-bold text-ink";
+  // 위험 요소는 '위험' 섹션에, 나머지 발견은 '주요 발견'에 — 같은 내용을 두 번 쓰지 않는다.
+  const risks = report.findings.filter((f) => f.impact === "negative");
+  const findings = report.findings.filter((f) => f.impact !== "negative");
 
   const saveTitle = () => {
     const t = draft.trim();
@@ -129,18 +133,87 @@ function ReportDetail({ report }: { report: SavedReport }) {
       </div>
 
       <Panel as="article" className="overflow-hidden" aria-label="보고서 본문">
-        <div className="px-5 py-6 md:px-8">
-          <p className="text-meta text-ink-dim">
-            저장 {DATETIME.format(new Date(report.createdAt))} · 작성 {BRAND.user.display} · 샘플 데이터 · 규칙 기반 분석
-          </p>
-          <h2 className="mt-3 text-caption font-semibold text-ink-dim">요약</h2>
-          <p className="mt-1 text-lead font-medium text-ink">{report.headline}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-soft px-5 py-3 text-meta text-ink-dim md:px-8">
+          <span>분석 기록 · {DATETIME.format(new Date(report.createdAt))} 저장</span>
+          <span>{report.data?.source === "upload" ? "업로드 데이터" : "샘플 데이터"} · 규칙 기반 분석</span>
         </div>
 
-        <div className={section}>
-          <h2 className={h}>핵심 지표</h2>
+        {/* 1. 핵심 요약 */}
+        <section className="px-5 py-6 md:px-8" aria-labelledby="r-summary">
+          <h2 id="r-summary" className={h}>
+            1. 핵심 요약
+          </h2>
+          <p className="mt-3 text-title font-bold tracking-tight text-ink">{report.headline}</p>
+          {report.brief && (
+            <dl className="mt-5 grid gap-5 md:grid-cols-3">
+              {(
+                [
+                  ["가장 큰 변화", report.brief.change],
+                  ["가능성 높은 원인(추정)", report.brief.cause],
+                  ["지금 확인할 위험", report.brief.risk],
+                ] as const
+              ).map(([label, p]) => (
+                <div key={label} className="border-t-2 border-line pt-3">
+                  <dt className="text-caption font-semibold text-ink-dim">{label}</dt>
+                  <dd className="mt-1 text-body font-semibold text-ink">{p?.title ?? "해당 없음"}</dd>
+                  {p && <dd className="mt-1 text-sub text-ink-soft">{p.body}</dd>}
+                </div>
+              ))}
+            </dl>
+          )}
+        </section>
+
+        {/* 2. 분석 범위 */}
+        <section className={section} aria-labelledby="r-scope">
+          <h2 id="r-scope" className={h}>
+            2. 분석 범위
+          </h2>
+          <dl className="mt-3 grid gap-x-8 gap-y-3 text-sub sm:grid-cols-2">
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0 text-ink-dim">기간</dt>
+              <dd className="text-ink">
+                {formatDateKR(report.scope.start)} ~ {formatDateKR(report.scope.end)} ({report.scope.days}일)
+              </dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0 text-ink-dim">비교 기준</dt>
+              <dd className="text-ink">{report.comparison?.split(" · ")[1] ?? (report.kpis[0]?.comparable === false ? "비교할 이전 기간 없음" : "이전 같은 기간")}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0 text-ink-dim">대상</dt>
+              <dd className="text-ink">
+                {report.scope.channel === "all" ? "전체 채널" : report.scope.channel} · {report.scope.product === "all" ? "전체 상품" : report.scope.product}
+              </dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0 text-ink-dim">데이터</dt>
+              <dd className="text-ink">
+                {report.datasetName}
+                {report.data && (
+                  <span className="text-ink-soft">
+                    {" "}
+                    · {report.data.rows.toLocaleString("ko-KR")}행 · {report.data.days}일치 · 마지막 날짜 {formatDateKR(report.data.lastDate)}
+                  </span>
+                )}
+              </dd>
+            </div>
+            {report.data && report.data.estimated.length > 0 && (
+              <div className="flex gap-3 sm:col-span-2">
+                <dt className="w-20 shrink-0 text-ink-dim">제외한 지표</dt>
+                <dd className="text-ink-soft">{report.data.estimated.join(", ")} 열이 없어 관련 지표는 계산하지 않았습니다.</dd>
+              </div>
+            )}
+          </dl>
+        </section>
+
+        {/* 3. 주요 발견 */}
+        <section className={section} aria-labelledby="r-findings">
+          <h2 id="r-findings" className={h}>
+            3. 주요 발견
+          </h2>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sub">
+              <caption className="sr-only">지표 변화</caption>
               <thead>
                 <tr className="whitespace-nowrap border-b border-line text-left text-caption text-ink-dim">
                   <th className="py-2 font-semibold">지표</th>
@@ -169,74 +242,115 @@ function ReportDetail({ report }: { report: SavedReport }) {
               </tbody>
             </table>
           </div>
-        </div>
-
-        <div className={section}>
-          <h2 className={h}>주요 변화</h2>
-          {report.findings.length === 0 && <p className="mt-3 text-sub text-ink-soft">이 범위에서는 뚜렷한 변화가 없었습니다.</p>}
-          <ol className="mt-3 space-y-4">
-            {report.findings.map((f, i) => (
-              <li key={i}>
-                <p className="text-body font-semibold text-ink">
-                  {i + 1}. {f.title}
-                </p>
-                <p className="mt-1 text-sub text-ink-soft">{f.description}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-
-        <div className={section}>
-          <h2 className={h}>확인이 필요한 변화</h2>
-          {report.anomalies.length === 0 ? (
-            <p className="mt-3 text-sub text-ink-soft">이 범위에서는 주의가 필요한 변화가 없었습니다.</p>
+          {findings.length === 0 ? (
+            <p className="mt-4 text-sub text-ink-soft">이 범위에서는 근거를 들어 말할 만한 변화가 없었습니다.</p>
           ) : (
-            <ul className="mt-3 space-y-3">
+            <ol className="mt-5 space-y-4">
+              {findings.map((f, i) => (
+                <li key={i}>
+                  <p className="text-body font-semibold text-ink">
+                    {i + 1}) {f.title}
+                  </p>
+                  <p className="mt-1 text-sub text-ink-soft">{f.description}</p>
+                  {f.evidence && f.evidence.length > 0 && (
+                    <p className="tabular mt-1 text-meta text-ink-dim">근거 · {f.evidence.join(" / ")}</p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+          {report.forecasts.length > 0 && (
+            <div className="mt-6 rounded-control bg-surface-soft px-4 py-4">
+              <h3 className="text-sub font-semibold text-ink">다음 7일 전망 <span className="font-normal text-ink-dim">· 최근 추세 기반 추정치</span></h3>
+              <dl className="mt-2 grid gap-3 sm:grid-cols-3">
+                {report.forecasts.map((f) => (
+                  <div key={f.label}>
+                    <dt className="text-meta text-ink-soft">{f.label}</dt>
+                    <dd className="tabular mt-0.5 text-body font-bold text-ink">
+                      {f.format === "currency" ? formatKRW(f.next7Total) : formatNumber(f.next7Total)}{" "}
+                      <span className={`text-meta font-semibold ${f.changePct >= 0 ? "text-positive" : "text-negative"}`}>
+                        직전 7일 대비 {f.changePct >= 0 ? "+" : ""}
+                        {f.changePct.toFixed(1)}%
+                      </span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+        </section>
+
+        {/* 4. 위험 요소 */}
+        <section className={section} aria-labelledby="r-risks">
+          <h2 id="r-risks" className={h}>
+            4. 위험 요소
+          </h2>
+          {risks.length === 0 && report.anomalies.length === 0 ? (
+            <p className="mt-3 text-sub text-ink-soft">저장 시점에 확인이 필요한 위험 신호는 없었습니다.</p>
+          ) : (
+            <ul className="mt-3 space-y-4">
+              {risks.map((f, i) => (
+                <li key={`f${i}`}>
+                  <p className="text-body font-semibold text-ink">{f.title}</p>
+                  <p className="mt-1 text-sub text-ink-soft">{f.description}</p>
+                </li>
+              ))}
               {report.anomalies.map((a, i) => (
-                <li key={i} className="text-sub text-ink-soft">
-                  <b className={`font-semibold ${SEVERITY_META[a.severity].text}`}>[{SEVERITY_META[a.severity].label}]</b>{" "}
-                  <b className="font-semibold text-ink">{a.title}</b> — {a.description}
+                <li key={`a${i}`} className="text-sub text-ink-soft">
+                  <p className="text-body font-semibold text-ink">
+                    <span className={SEVERITY_META[a.severity].text}>[{SEVERITY_META[a.severity].label}]</span> {a.title}
+                  </p>
+                  <p className="mt-1">
+                    {formatDateKR(a.date)}
+                    {a.days && a.days > 1 ? `부터 ${a.days}일간` : ""}
+                    {a.ongoing ? " · 저장 시점에 진행 중" : ""} — {a.description}
+                  </p>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </section>
 
-        {report.forecasts.length > 0 && (
-        <div className={section}>
-          <h2 className={h}>다음 7일 예측</h2>
-          <p className="mt-1 text-meta text-ink-dim">최근 14일 추세 기반 단순 모델 · 추정치</p>
-          <dl className="mt-3 grid gap-4 sm:grid-cols-3">
-            {report.forecasts.map((f) => (
-              <div key={f.label}>
-                <dt className="text-meta text-ink-soft">{f.label}</dt>
-                <dd className="tabular mt-1 text-card font-bold text-ink">
-                  {f.format === "currency" ? formatKRW(f.next7Total) : formatNumber(f.next7Total)}
-                </dd>
-                <dd className={`tabular text-meta font-semibold ${f.changePct >= 0 ? "text-positive" : "text-negative"}`}>
-                  직전 7일 대비 {f.changePct >= 0 ? "+" : ""}
-                  {f.changePct.toFixed(1)}%
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-        )}
+        {/* 5. 권장 행동 */}
+        <section className={section} aria-labelledby="r-actions">
+          <h2 id="r-actions" className={h}>
+            5. 권장 행동
+          </h2>
+          {report.recommendations.length === 0 ? (
+            <p className="mt-3 text-sub text-ink-soft">근거를 들어 제안할 행동이 없었습니다.</p>
+          ) : (
+            <ol className="mt-3 space-y-4">
+              {report.recommendations.map((r, i) => (
+                <li key={i}>
+                  <p className="flex flex-wrap items-center gap-2 text-body font-semibold text-ink">
+                    {i + 1}) {r.title}
+                    <span className={`rounded-full px-2 py-0.5 text-caption font-semibold ${PRIORITY[r.priority].cls}`}>{PRIORITY[r.priority].label}</span>
+                  </p>
+                  <p className="mt-1 text-sub text-ink-soft">{r.description}</p>
+                  {r.evidence ? (
+                    <p className="mt-1 text-meta text-ink-dim">근거 · {r.evidence}</p>
+                  ) : r.expectedEffect ? (
+                    <p className="mt-1 text-meta text-ink-dim">예상 효과(추정) {r.expectedEffect}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
 
-        <div className={section}>
-          <h2 className={h}>실행 제안</h2>
-          <ol className="mt-3 space-y-4">
-            {report.recommendations.map((r, i) => (
-              <li key={i}>
-                <p className="text-body font-semibold text-ink">
-                  {i + 1}. {r.title}
-                </p>
-                <p className="mt-1 text-sub text-ink-soft">{r.description}</p>
-                <p className="mt-1 text-meta text-ink-dim">예상 효과(추정) {r.expectedEffect}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
+        {/* 6. 생성 시점 */}
+        <section className={`${section} bg-surface-soft`} aria-labelledby="r-meta">
+          <h2 id="r-meta" className={h}>
+            6. 생성 시점
+          </h2>
+          <p className="mt-2 text-sub text-ink">
+            {DATETIME.format(new Date(report.createdAt))} · 작성 {BRAND.user.display}
+          </p>
+          <p className="mt-1 text-meta text-ink-dim">
+            이 보고서는 저장한 순간의 계산 결과입니다. 이후 데이터가 바뀌어도 내용은 그대로 남습니다.
+            {source ? " 지금 데이터로 다시 보려면 '이 범위로 대시보드 열기'를 누르세요." : " 원본 데이터가 이 브라우저에 없어 다시 열 수는 없습니다."}
+          </p>
+        </section>
       </Panel>
 
       <div className="no-print mt-4 flex justify-end">
@@ -261,6 +375,7 @@ function ReportLibrary() {
   const [busy, setBusy] = useState(false);
 
   const scope = useMemo(() => (dataset ? scopeOf(dataset, filters) : null), [dataset, filters]);
+  const preview = useMemo(() => (dataset ? summarize(dataset, filters) : null), [dataset, filters]);
   const existing = dataset ? reports.find((r) => r.signature === reportSignature(dataset, filters)) : undefined;
 
   const create = () => {
@@ -276,7 +391,7 @@ function ReportLibrary() {
 
   return (
     <>
-      <PageHeader title="보고서" description="저장한 분석 결과를 다시 열거나 PDF로 내보냅니다" />
+      <PageHeader title="보고서" description="특정 시점의 분석 결론을 업무 기록으로 남기고, 다시 열거나 PDF로 공유합니다" />
 
       {dataset && scope ? (
         <>
@@ -288,6 +403,17 @@ function ReportLibrary() {
           <p className="mt-1 text-sub text-ink-soft">
             <b className="font-semibold text-ink">{dataset.name}</b> · {scopeLabel(scope)}
           </p>
+          {preview && (
+            <div className="mt-4 rounded-control border border-line bg-surface-soft px-4 py-3">
+              <p className="text-caption font-semibold text-ink-dim">이 결론이 기록됩니다</p>
+              <p className="mt-1 text-body font-semibold text-ink">{preview.headline}</p>
+              <p className="mt-1 text-meta text-ink-soft">
+                {[preview.change?.title, preview.risk ? `위험: ${preview.risk.title}` : null, `권장 행동 ${preview.actions.length}건`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -347,7 +473,16 @@ function ReportLibrary() {
                   <span className="mt-1 block text-meta text-ink-dim">
                     {r.datasetName} · {scopeLabel(r.scope)}
                   </span>
-                  <span className="mt-1 line-clamp-2 block text-sub text-ink-soft">{r.headline}</span>
+                  <span className="mt-2 block text-sub text-ink">
+                    {r.headline}
+                    {r.brief?.change && <span className="text-ink-soft"> {r.brief.change.title}.</span>}
+                  </span>
+                  {(r.brief?.risk || r.anomalies.length > 0) && (
+                    <span className="mt-1 block text-meta text-ink-dim">
+                      위험 요소 {r.findings.filter((f) => f.impact === "negative").length + r.anomalies.length}건
+                      {r.brief?.risk ? ` · ${r.brief.risk.title}` : ""}
+                    </span>
+                  )}
                 </Link>
               </li>
             ))}

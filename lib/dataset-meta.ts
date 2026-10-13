@@ -1,4 +1,6 @@
+import { filterDimensions } from "./analytics-engine";
 import { detectAnomalies } from "./anomaly-engine";
+import { computeForecasts } from "./forecast-engine";
 import { DemoDataset, DerivedField, Filters, KpiResult } from "./types";
 
 /**
@@ -26,7 +28,7 @@ export function availableKpis(kpis: KpiResult[], ds: DemoDataset | null | undefi
 }
 
 /** 이상치 탐지에서 뺄 지표 (anomaly-engine의 지표 키) */
-function anomalyExclusions(ds: DemoDataset | null | undefined) {
+export function anomalyExclusions(ds: DemoDataset | null | undefined) {
   const out: ("visitors" | "orders" | "conversionRate" | "aov")[] = [];
   if (!has(ds, "visitors")) out.push("visitors", "conversionRate");
   if (!has(ds, "orders")) out.push("orders", "aov", "conversionRate");
@@ -46,4 +48,11 @@ export function insightContext(ds: DemoDataset, filters: Filters) {
 
 export function anomaliesFor(ds: DemoDataset, filters: Filters) {
   return detectAnomalies(ds.rows, filters, { exclude: anomalyExclusions(ds) });
+}
+
+/** 예측도 실제 값이 있는 지표만 — 추정으로 채운 주문·고객 수를 예측해 보여주지 않는다. */
+export function forecastsFor(ds: DemoDataset, filters: Filters) {
+  return computeForecasts(filterDimensions(ds.rows, filters)).filter(
+    (f) => (f.key !== "orders" || has(ds, "orders")) && (f.key !== "customers" || has(ds, "customers"))
+  );
 }

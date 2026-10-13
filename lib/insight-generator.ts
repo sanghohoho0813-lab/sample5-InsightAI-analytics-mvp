@@ -1,292 +1,430 @@
-import { applyFilters, channelShares, dailySeries, exploreSeries, isComparable, resolveDates, uniqueDates } from "./analytics-engine";
-import { formatKRW, formatKRWExact } from "./format";
-import { computeForecasts, FORECAST_MIN_DAYS } from "./forecast-engine";
-import { DataRow, DerivedField, Filters, Insight, Recommendation } from "./types";
+import { applyFilters, isComparable, resolveDates } from "./analytics-engine";
+import {
+  adEfficiency,
+  Contribution,
+  contributions,
+  decompose,
+  dominantFactor,
+  driverDim,
+  FactorChange,
+  factorLine,
+  halfTrend,
+  Momentum,
+  productMomentum,
+  signed,
+  signedKRW,
+  sumRows,
+  weakAdSpend,
+} from "./drivers";
+import { formatKRW, formatMonthDay, formatNumber, josa } from "./format";
+import { urgency } from "./anomaly-engine";
+import { diagnose } from "./investigate";
+import { Anomaly, DataRow, DerivedField, DrillTarget, Filters, Insight, MetricKey, Recommendation } from "./types";
 
-/** 데이터 질의 기준 범위 — 전체 채널·최근 30일 */
-const QA_FILTERS: Filters = {
-  preset: "30",
-  rangeDays: 30,
-  channel: "all",
-  product: "all",
-};
-
-interface Context {
+export interface Context {
   rows: DataRow[];
   filters: Filters;
   /** 업로드 파일에서 추정으로 채운 필드 — 이 값에 기대는 인사이트는 만들지 않는다 */
   derived?: DerivedField[];
 }
 
-/** 데이터에서 계산된 값 기반으로 규칙형 인사이트를 생성한다. (LLM 연결 시 이 결과를 프롬프트 컨텍스트로 사용) */
-export function generateInsights({ rows, filters, derived = [] }: Context): Insight[] {
+const BASIS = {
+  compare: "이전 같은 기간과 실제 매출 차이",
+  factor: "매출 = 방문자 × 전환율 × 객단가로 나눠 계산",
+  factorOrders: "매출 = 주문 수 × 객단가로 나눠 계산",
+  momentum: "최근 7일 vs 그 전 3주(주 단위 중앙값)",
+  ad: "이전 같은 기간과 실제 광고비·주문 수 비교",
+  half: "선택 기간을 반으로 나눠 비교",
+};
+
+/** 요인이 움직인 방향을 사람 말로 — "전환율 개선", "방문자 감소" */
+export function factorPhrase(f: FactorChange): string {
+  const up = f.pct >= 0;
+  switch (f.key) {
+    case "visitors":
+      return up ? "방문자 증가" : "방문자 감소";
+    case "conversion":
+      return up ? "전환율 개선" : "전환율 하락";
+    case "aov":
+      return up ? "객단가 상승" : "객단가 하락";
+    default:
+      return up ? "주문 증가" : "주문 감소";
+  }
+}
+
+export const FACTOR_METRIC: Record<FactorChange["key"], MetricKey> = {
+  visitors: "revenue",
+  conversion: "conversion",
+  aov: "aov",
+  orders: "orders",
+};
+
+function unitText(m: Momentum, v: number) {
+  return m.unit === "orders" ? `${formatNumber(v)}건` : formatKRW(v);
+}
+
+/** 채널·상품 하나의 매출 변화를 요인으로 나눈다 */
+export function segmentFactors(ctx: Context, target: DrillTarget): FactorChange[] | null {
+  const { rows, filters, derived = [] } = ctx;
+  const f = { ...filters, channel: target.channel ?? filters.channel, product: target.product ?? filters.product };
+  const { current, previous } = applyFilters(rows, f);
+  return decompose(sumRows(current), sumRows(previous), derived);
+}
+
+const splittable = (rows: DataRow[], dim: "channel" | "product") => new Set(rows.map((r) => r[dim])).size > 1;
+const dimTarget = (dim: "channel" | "product", name: string): DrillTarget =>
+  dim === "channel" ? { channel: name, metric: "revenue" } : { product: name, metric: "revenue" };
+
+/**
+ * 계산된 값만으로 인사이트를 만든다. 모든 인사이트는
+ * 결론(제목) → 수치(설명) → 확인할 수 있는 근거(evidence) → 계산 방식(basis)을 갖는다.
+ */
+export function generateInsights(ctx: Context): Insight[] {
+  const { rows, filters, derived = [] } = ctx;
   const insights: Insight[] = [];
-  const shares = channelShares(rows, filters);
-  const { current, currentDates } = applyFilters(rows, filters);
   const comparable = isComparable(rows, filters);
-  const estimated = (f: DerivedField) => derived.includes(f);
+  const { current, previous, currentDates } = applyFilters(rows, filters);
+  const n = currentDates.length;
+  const dim = driverDim(filters, (d) => splittable(rows, d));
+  const total = { cur: sumRows(current), prev: sumRows(previous) };
+  const totalPct = total.prev.revenue > 0 ? ((total.cur.revenue - total.prev.revenue) / total.prev.revenue) * 100 : 0;
 
-  // 1) 매출 상승/하락 요인: 비중 변화가 가장 큰 채널 (채널이 2개 이상이고 이전 기간이 있을 때)
-  const mover = [...shares].sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct))[0];
-  if (comparable && shares.length > 1 && mover && Math.abs(mover.changePct) >= 1) {
-    const up = mover.changePct > 0;
+  // 1) 기여도 — 증감분을 가장 많이 만든 채널(채널을 골랐으면 상품)
+  if (comparable && dim) {
+    const c = contributions(rows, filters, dim);
+    const unit = dim === "channel" ? "채널" : "상품";
+    const evidence = c.items.slice(0, 4).map((i) => `${i.name} ${formatKRW(i.prev)} → ${formatKRW(i.cur)} (${signed(i.pct)})`);
+    const top = c.items[0];
+    if (Math.abs(totalPct) < 2) {
+      // 전체는 비슷한데 안에서 엇갈린 경우
+      const gain = [...c.items].sort((a, b) => b.delta - a.delta)[0];
+      const loss = [...c.items].sort((a, b) => a.delta - b.delta)[0];
+      if (gain && loss && gain.delta > 0 && loss.delta < 0) {
+        insights.push({
+          id: "driver",
+          category: `${unit}별 기여`,
+          title: `전체 매출은 비슷하지만 ${unit}별로 엇갈렸습니다`,
+          description: `${josa(gain.name, "은")} ${formatKRW(gain.delta)} 늘고 ${josa(loss.name, "은")} ${formatKRW(Math.abs(loss.delta))} 줄어, 전체 변화는 ${signed(totalPct, 1)}에 그쳤습니다.`,
+          evidence,
+          basis: BASIS.compare,
+          impact: "neutral",
+          drill: dimTarget(dim, loss.name),
+        });
+      }
+    } else if (top && top.share > 0) {
+      const up = c.delta > 0;
+      const share = Math.round(top.share);
+      insights.push({
+        id: "driver",
+        category: `${unit}별 기여`,
+        title:
+          share > 100
+            ? `${top.name} 하나가 전체 ${up ? "증가분" : "감소분"}보다 크게 움직였습니다`
+            : up
+              ? `매출 증가분의 ${share}%는 ${top.name}에서 나왔습니다`
+              : `${top.name} 감소가 전체 하락의 ${share}%를 설명합니다`,
+        description:
+          share > 100
+            ? `${top.name} 매출이 ${signedKRW(top.delta)} 움직여, 다른 ${unit}의 반대 움직임(${signedKRW(top.delta - c.delta)})을 ${up ? "메우고도 남았습니다" : "모두 상쇄했습니다"}.`
+            : `${top.name} 매출이 ${formatKRW(top.prev)}에서 ${josa(formatKRW(top.cur), "으로")} ${signedKRW(top.delta)}(${signed(top.pct)}) ${top.delta >= 0 ? "늘었습니다" : "줄었습니다"}. 전체 ${up ? "증가분" : "감소분"}은 ${formatKRW(Math.abs(c.delta))}입니다.`,
+        evidence,
+        basis: BASIS.compare,
+        impact: up ? "positive" : "negative",
+        drill: dimTarget(dim, top.name),
+      });
+    }
+
+    // 2) 역행 — 전체와 반대로 움직인 채널·상품(전체 매출의 5% 이상인 것만)
+    const opposite = c.items
+      .filter((i) => i.prev >= c.prev * 0.05 && Math.abs(i.pct) >= 5 && Math.sign(i.delta) !== Math.sign(c.delta))
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
+    if (opposite && Math.abs(totalPct) >= 2) {
+      const factors = segmentFactors(ctx, dim === "channel" ? { channel: opposite.name } : { product: opposite.name });
+      const dom = dominantFactor(factors);
+      const down = opposite.delta < 0;
+      insights.push({
+        id: "counter-trend",
+        category: down ? "위험 신호" : "버팀목",
+        title: `전체는 ${down ? "늘었지만" : "줄었지만"} ${opposite.name} 매출은 ${Math.abs(opposite.pct).toFixed(0)}% ${down ? "줄었습니다" : "늘었습니다"}`,
+        description: `${opposite.name} 매출 ${formatKRW(opposite.prev)} → ${formatKRW(opposite.cur)}(${signedKRW(opposite.delta)}).${
+          dom && factors ? ` ${josa(factorLine(factors), "으로")}, ${josa(factorPhrase(dom), "이")} 가장 컸습니다.` : ""
+        }`,
+        evidence: factors ? factors.map((f) => `${f.label} ${f.text} (${signed(f.pct)})`) : [`${opposite.name} ${signed(opposite.pct)}`],
+        basis: factors ? (factors[0].key === "visitors" ? BASIS.factor : BASIS.factorOrders) : BASIS.compare,
+        impact: down ? "negative" : "positive",
+        drill: dimTarget(dim, opposite.name),
+      });
+    }
+  }
+
+  // 3) 요인 — 전체 매출 변화가 방문자·전환율·객단가 중 어디서 나왔나
+  if (comparable) {
+    const factors = decompose(total.cur, total.prev, derived);
+    const dom = dominantFactor(factors);
+    if (factors && dom) {
+      const up = total.cur.revenue >= total.prev.revenue;
+      insights.push({
+        id: "factor",
+        category: "변화 요인",
+        title: `매출 ${up ? "증가" : "감소"}는 주로 ${factorPhrase(dom)}에서 나왔습니다`,
+        description: `${factorLine(factors)}. ${dom.label} 변화가 매출 변화의 ${Math.min(100, Math.round(dom.share))}%가량을 설명합니다.`,
+        evidence: factors.map((f) => `${f.label} ${f.text} (${signed(f.pct)})`),
+        basis: factors[0].key === "visitors" ? BASIS.factor : BASIS.factorOrders,
+        impact: up ? "positive" : "negative",
+        drill: { metric: FACTOR_METRIC[dom.key] },
+      });
+    }
+  }
+
+  // 4) 광고비가 늘어난 만큼 주문이 늘지 않은 채널
+  const ads = adEfficiency(rows, filters, derived);
+  const weak = weakAdSpend(ads);
+  if (weak) {
     insights.push({
-      id: "channel-mix",
-      category: up ? "매출 상승 요인" : "채널 변화",
-      title: `${mover.channel} 채널 비중 ${up ? "확대" : "축소"}`,
-      description: `${mover.channel} 채널의 매출 비중이 이전 기간보다 ${Math.abs(mover.changePct).toFixed(1)}%p ${up ? "증가" : "감소"}했습니다.`,
-      detail: `현재 ${mover.channel} 채널은 전체 매출의 ${mover.share.toFixed(1)}%(${formatKRW(mover.revenue)})를 차지합니다. ${up ? "해당 채널의 전환 흐름이 개선되고 있어 예산 확대를 검토할 만합니다." : "유입 또는 전환 단계에서 이탈 요인을 점검해보세요."}`,
+      id: "ad-weak",
+      category: "광고 효율",
+      title: `${weak.channel} 광고비는 ${weak.adPct.toFixed(0)}% 늘었지만 주문은 ${
+        weak.ordersPct >= 0 ? `${weak.ordersPct.toFixed(0)}% 증가에 그쳤습니다` : `오히려 ${Math.abs(weak.ordersPct).toFixed(0)}% 줄었습니다`
+      }`,
+      description: `광고비 ${formatKRW(weak.adPrev)} → ${formatKRW(weak.adCur)}(${signedKRW(weak.adCur - weak.adPrev)}). 광고비 1원당 매출이 ${weak.roasPrev.toFixed(1)}원에서 ${weak.roasCur.toFixed(1)}원으로 낮아졌습니다.`,
+      evidence: [
+        `광고비 ${signed(weak.adPct)}`,
+        `주문 수 ${signed(weak.ordersPct)}`,
+        `매출 ${signed(weak.revenuePct)}`,
+        `광고비 1원당 매출 ${weak.roasPrev.toFixed(1)}원 → ${weak.roasCur.toFixed(1)}원`,
+      ],
+      basis: BASIS.ad,
+      impact: "negative",
+      drill: { channel: weak.channel, metric: "orders" },
+    });
+  }
+
+  // 5) 상품 흐름 — 최근 7일이 평소보다 크게 많거나 적은 상품
+  const momentum = productMomentum(rows, filters, derived);
+  const rising = momentum.find((m) => m.pct >= 15);
+  const falling = [...momentum].reverse().find((m) => m.pct <= -15);
+  for (const m of [rising, falling]) {
+    if (!m) continue;
+    const up = m.pct > 0;
+    insights.push({
+      id: up ? "product-rising" : "product-falling",
+      category: "상품 흐름",
+      title: `'${m.product}' 최근 7일 판매가 평소보다 ${Math.abs(m.pct).toFixed(0)}% ${up ? "많습니다" : "적습니다"}`,
+      description: `최근 7일 ${unitText(m, m.recent)}, 그 전 3주는 한 주에 ${unitText(m, m.base)} 수준이었습니다.`,
+      evidence: [`최근 7일 ${unitText(m, m.recent)}`, `그 전 3주 주간 중앙값 ${unitText(m, m.base)}`],
+      basis: BASIS.momentum,
       impact: up ? "positive" : "negative",
-      drill: { channel: mover.channel, metric: "revenue" },
+      drill: { product: m.product, metric: m.unit === "orders" ? "orders" : "revenue" },
     });
   }
 
-  // 2) 고객 행동: 재구매 비중이 높은 구간 vs 낮은 구간의 객단가 비교 (재구매/신규 객단가 추정)
-  let newCus = 0, retCus = 0;
-  for (const r of current) {
-    newCus += r.newCustomers;
-    retCus += r.returningCustomers;
-  }
-  const withShare = current
-    .filter((r) => r.customers > 0 && r.orders > 0)
-    .map((r) => ({ aov: r.aov, share: r.returningCustomers / r.customers, w: r.orders }));
-  const sortedShare = [...withShare].sort((a, b) => a.share - b.share);
-  const medShare = sortedShare[Math.floor(sortedShare.length / 2)]?.share ?? 0;
-  const wavg = (arr: { aov: number; w: number }[]) => {
-    const w = arr.reduce((a, x) => a + x.w, 0);
-    return w > 0 ? arr.reduce((a, x) => a + x.aov * x.w, 0) / w : 0;
-  };
-  const retAov = wavg(withShare.filter((x) => x.share > medShare));
-  const newAov = wavg(withShare.filter((x) => x.share <= medShare));
-  const hasCustomerData = !estimated("customers") && !estimated("returningCustomers") && !estimated("orders");
-  if (hasCustomerData && newAov > 0 && retAov > 0 && Math.abs(((retAov - newAov) / newAov) * 100) >= 5) {
-    const diff = ((retAov - newAov) / newAov) * 100;
-    insights.push({
-      id: "customer-behavior",
-      category: "고객 행동 변화",
-      title: `재구매 고객 객단가가 신규 대비 ${Math.abs(diff).toFixed(0)}% ${diff >= 0 ? "높음" : "낮음"}`,
-      description: `재구매 고객의 평균 주문액(추정 ${formatKRWExact(retAov)})이 신규 고객(${formatKRWExact(newAov)})보다 ${Math.abs(diff).toFixed(0)}% ${diff >= 0 ? "높습니다" : "낮습니다"}.`,
-      detail: `이번 기간 재구매 고객은 ${Math.round(retCus).toLocaleString("ko-KR")}명으로 전체 구매 고객의 ${((retCus / (newCus + retCus)) * 100).toFixed(0)}%입니다. ${diff >= 0 ? "재구매 고객 대상 CRM 캠페인의 기대 효율이 높습니다." : "재구매 고객의 구매 단가를 높일 번들 구성이 필요해 보입니다."}`,
-      impact: diff >= 0 ? "positive" : "neutral",
-      drill: { metric: "aov" },
-    });
+  // 6) 재구매 고객 비중 변화(고객 컬럼이 실제 값일 때만)
+  const realCustomers = !derived.includes("customers") && !derived.includes("returningCustomers");
+  if (comparable && realCustomers && total.cur.customers > 0 && total.prev.customers > 0) {
+    const cur = (total.cur.returning / total.cur.customers) * 100;
+    const prev = (total.prev.returning / total.prev.customers) * 100;
+    if (Math.abs(cur - prev) >= 2) {
+      const up = cur > prev;
+      insights.push({
+        id: "repeat-share",
+        category: "고객",
+        title: `재구매 고객 비중이 ${prev.toFixed(0)}%에서 ${cur.toFixed(0)}%로 ${up ? "올랐습니다" : "내려갔습니다"}`,
+        description: `이번 기간 구매 고객 ${formatNumber(total.cur.customers)}명 중 ${formatNumber(total.cur.returning)}명이 재구매 고객입니다.`,
+        evidence: [`재구매 비중 ${prev.toFixed(1)}% → ${cur.toFixed(1)}%`, `재구매 고객 ${formatNumber(total.prev.returning)}명 → ${formatNumber(total.cur.returning)}명`],
+        basis: BASIS.compare.replace("매출", "고객 수"),
+        impact: up ? "positive" : "negative",
+        drill: { metric: "customers" },
+      });
+    }
   }
 
-  // 3) 마케팅 성과: 광고비 대비 매출(ROAS)이 가장 높은 채널 ('기타' 채널은 비교에서 제외)
-  const roas = shares
-    .filter((s) => s.channel !== "기타")
-    .map((s) => {
-      const ad = current.filter((r) => r.channel === s.channel).reduce((a, r) => a + r.adSpend, 0);
-      return { channel: s.channel, roas: ad > 0 ? s.revenue / ad : 0 };
-    })
-    .filter((s) => s.roas > 0)
-    .sort((a, b) => b.roas - a.roas);
-  if (roas.length >= 2) {
+  // 7) 채널별 광고비 1원당 매출 차이(‘기타’ 채널 제외, 1.3배 이상 차이일 때)
+  const roas = ads.filter((a) => a.channel !== "기타").sort((a, b) => b.roasCur - a.roasCur);
+  if (roas.length >= 2 && roas[0].roasCur >= roas[roas.length - 1].roasCur * 1.3) {
     const best = roas[0];
     const worst = roas[roas.length - 1];
     insights.push({
-      id: "marketing-roi",
-      category: "마케팅 성과",
-      title: `${best.channel} 유입의 광고 효율이 가장 높음`,
-      description: `${best.channel} 채널의 광고비 대비 매출(ROAS)이 ${best.roas.toFixed(1)}배로, ${worst.channel}(${worst.roas.toFixed(1)}배)보다 높습니다.`,
-      detail: `동일 예산 기준 ${best.channel} 채널의 기대 매출이 ${(best.roas / Math.max(0.1, worst.roas)).toFixed(1)}배 높습니다. 저효율 채널 예산 일부를 이동하는 것을 검토해보세요.`,
-      impact: "positive",
-      drill: { channel: best.channel, metric: "revenue" },
+      id: "ad-roas",
+      category: "광고 효율",
+      title: `광고비 1원당 매출은 ${josa(best.channel, "이")} ${worst.channel}의 ${(best.roasCur / worst.roasCur).toFixed(1)}배입니다`,
+      description: `최근 ${n}일 광고비 1원당 매출: ${best.channel} ${best.roasCur.toFixed(1)}원, ${worst.channel} ${worst.roasCur.toFixed(1)}원.`,
+      evidence: roas.map((a) => `${a.channel} ${a.roasCur.toFixed(1)}원 (광고비 ${formatKRW(a.adCur)})`),
+      basis: "기간 합계 매출 ÷ 기간 합계 광고비",
+      impact: "neutral",
+      drill: { channel: worst.channel, metric: "revenue" },
     });
   }
 
-  // 4) 제품 인사이트: 선택 기간 내 최근 절반 vs 직전 절반 성장률 최고 상품
-  const { currentDates: scopeDates } = resolveDates(rows, filters);
-  const half = Math.max(1, Math.floor(scopeDates.length / 2));
-  const recent = new Set(scopeDates.slice(-half));
-  const before = new Set(scopeDates.slice(-half * 2, -half));
-  const growth = new Map<string, { rec: number; bef: number }>();
-  for (const r of rows) {
-    if (!growth.has(r.product)) growth.set(r.product, { rec: 0, bef: 0 });
-    const g = growth.get(r.product)!;
-    if (recent.has(r.date)) g.rec += r.revenue;
-    else if (before.has(r.date)) g.bef += r.revenue;
-  }
-  const productGrowth = Array.from(growth.entries())
-    .map(([product, g]) => ({ product, pct: g.bef > 0 ? ((g.rec - g.bef) / g.bef) * 100 : 0, rec: g.rec }))
-    .sort((a, b) => b.pct - a.pct);
-  const topProduct = productGrowth[0];
-  const growthLabel = `최근 ${half}일`;
-  if (growth.size > 1 && topProduct && topProduct.pct > 5) {
-    insights.push({
-      id: "product-growth",
-      category: "제품 인사이트",
-      title: `'${topProduct.product}' 판매 증가율 ${growthLabel} 1위`,
-      description: `'${topProduct.product}'의 매출이 직전 ${half}일 대비 ${topProduct.pct.toFixed(0)}% 증가하며 가장 빠르게 성장하고 있습니다.`,
-      detail: `${growthLabel} 매출은 ${formatKRW(topProduct.rec)}입니다. 수요 증가 속도를 고려해 재고와 노출 지면을 미리 확보하는 것이 좋습니다.`,
-      impact: "positive",
-      drill: { product: topProduct.product, metric: "revenue" },
-    });
-  }
-
-  // 5) 전환율 추세
-  const daily = dailySeries(current, currentDates);
-  const mid = Math.floor(daily.length / 2);
-  const convA = daily.slice(0, mid).reduce((a, p) => a + p.conversionRate, 0) / Math.max(1, mid);
-  const convB = daily.slice(mid).reduce((a, p) => a + p.conversionRate, 0) / Math.max(1, daily.length - mid);
-  const convDelta = convA > 0 ? ((convB - convA) / convA) * 100 : 0;
-  if (!estimated("visitors") && !estimated("orders") && daily.length >= 6 && Math.abs(convDelta) >= 3) {
-    insights.push({
-      id: "conversion-trend",
-      category: "전환 추세",
-      title: `기간 후반 전환율 ${convDelta >= 0 ? "개선" : "하락"}`,
-      description: `기간 후반부 평균 전환율(${convB.toFixed(2)}%)이 전반부(${convA.toFixed(2)}%) 대비 ${Math.abs(convDelta).toFixed(0)}% ${convDelta >= 0 ? "개선됐습니다" : "하락했습니다"}.`,
-      detail: convDelta >= 0
-        ? "최근 유입 품질 또는 구매 경로 개선 효과가 나타나고 있습니다. 변화 시점의 캠페인·UX 변경 사항을 기록해두세요."
-        : "결제 단계 이탈, 유입 품질 저하 여부를 우선 점검해보세요.",
-      impact: convDelta >= 0 ? "positive" : "negative",
-      drill: { metric: "conversion" },
-    });
+  // 8) 비교할 이전 기간이 없으면 기간 안의 흐름이라도 말한다
+  if (!comparable) {
+    const h = halfTrend(rows, filters);
+    if (h && Math.abs(h.pct) >= 3) {
+      const up = h.pct > 0;
+      insights.push({
+        id: "half-trend",
+        category: "기간 안 흐름",
+        title: `기간 후반 ${h.days}일 매출이 전반보다 ${Math.abs(h.pct).toFixed(0)}% ${up ? "많습니다" : "적습니다"}`,
+        description: `전반 ${h.days}일 ${formatKRW(h.first)}, 후반 ${h.days}일 ${formatKRW(h.second)}. 이전 같은 기간 데이터가 없어 기간 안에서 비교했습니다.`,
+        evidence: [`전반 ${formatKRW(h.first)}`, `후반 ${formatKRW(h.second)}`],
+        basis: BASIS.half,
+        impact: up ? "positive" : "negative",
+        drill: { metric: "revenue" },
+      });
+    }
   }
 
   return insights;
 }
 
-export function generateRecommendations(ctx: Context): Recommendation[] {
+const RANK = { high: 0, medium: 1, low: 2 } as const;
+
+/** 요인별로 무엇을 확인하면 되는지 */
+const CHECK_BY_FACTOR: Record<FactorChange["key"], string> = {
+  visitors: "유입 경로(광고·검색 노출·외부 링크)별 방문자 변화를 먼저 확인하세요.",
+  conversion: "상세페이지·장바구니·결제 단계에서 이탈이 늘었는지, 가격·배송비가 바뀌었는지 확인하세요.",
+  aov: "할인·쿠폰 적용률과 고가 상품의 판매 비중이 바뀌었는지 확인하세요.",
+  orders: "판매 채널의 노출 위치와 재고 상태가 바뀌었는지 확인하세요.",
+};
+const KEEP_BY_FACTOR: Record<FactorChange["key"], string> = {
+  visitors: "방문자를 늘린 유입 경로(광고·검색·제휴)의 예산과 노출을 유지하세요.",
+  conversion: "최근 바꾼 상세페이지·결제 흐름·광고 문구를 기록하고 다른 채널에도 적용할 수 있는지 검토하세요.",
+  aov: "객단가를 올린 구성(묶음·고가 상품 노출)을 다른 채널에도 적용해보세요.",
+  orders: "주문을 늘린 노출·프로모션 조건을 기록해 두고 유지하세요.",
+};
+
+/**
+ * 실행 제안 — 각 제안은 특정 인사이트·이상치에서 나오고, 그 계산값을 근거로 단다.
+ * 근거 없는 일반론(예: "마케팅을 강화하세요")이나 효과 수치 추정은 만들지 않는다.
+ */
+export function generateRecommendations(ctx: Context, anomalies: Anomaly[] = []): Recommendation[] {
   const insights = generateInsights(ctx);
   const recs: Recommendation[] = [];
+  const byId = (id: string) => insights.find((i) => i.id === id);
 
-  if (insights.some((i) => i.id === "customer-behavior" && i.impact === "positive")) {
+  // 1) 아직 이어지고 있거나 가장 최근의 위험·주의 이상치
+  const end = resolveDates(ctx.rows, ctx.filters).currentDates.at(-1) ?? "";
+  const alert = [...anomalies]
+    .filter((a) => a.direction === "down" && a.severity !== "info")
+    .sort((a, b) => urgency(b, end) - urgency(a, end))[0];
+  if (alert) {
+    const d = diagnose(alert);
     recs.push({
-      id: "rec-crm",
-      title: "프로모션 최적화",
-      description: "객단가가 높은 재구매 고객을 대상으로 할인 쿠폰·전용 혜택을 발송해보세요.",
-      expectedEffect: "매출 +4~7%",
-      priority: "high",
+      id: "rec-anomaly",
+      title: `${formatMonthDay(alert.date)} ${alert.channel ?? "전체"} ${d.short} 원인 확인`,
+      description: d.steps[0],
+      evidence: `${alert.description}${alert.ongoing ? " 아직 평소 수준으로 돌아오지 않았습니다." : ""}`,
+      priority: alert.ongoing || alert.severity === "critical" ? "high" : "medium",
+      link: { kind: "anomaly", id: alert.id },
     });
   }
-  const roi = insights.find((i) => i.id === "marketing-roi");
-  if (roi) {
+
+  // 2) 줄어든 채널·상품 — 요인에 맞춰 무엇을 볼지
+  for (const id of ["driver", "counter-trend"]) {
+    const ins = byId(id);
+    if (!ins || ins.impact !== "negative" || !ins.drill) continue;
+    const name = ins.drill.channel ?? ins.drill.product!;
+    const dom = dominantFactor(segmentFactors(ctx, ins.drill));
     recs.push({
-      id: "rec-budget",
-      title: "광고 예산 조정",
-      description: `저효율 채널 예산 일부를 ${roi.title.replace(" 유입의 광고 효율이 가장 높음", "")} 채널로 이동하는 것을 검토하세요.`,
-      expectedEffect: "ROAS +10~15%",
+      id: `rec-${id}`,
+      title: `${name} 매출 감소 원인 점검`,
+      description: dom ? CHECK_BY_FACTOR[dom.key] : CHECK_BY_FACTOR.orders,
+      evidence: ins.title,
       priority: "high",
+      link: { kind: "segment", ...ins.drill },
     });
   }
-  const product = insights.find((i) => i.id === "product-growth");
-  if (product) {
+
+  // 3) 광고비 증액분 점검
+  const weak = byId("ad-weak");
+  if (weak?.drill?.channel) {
+    recs.push({
+      id: "rec-ad-weak",
+      title: `${weak.drill.channel} 광고 증액분 성과 점검`,
+      description: "늘린 캠페인·키워드별 주문 전환을 확인하고, 주문이 따라오지 않은 집행은 이전 수준으로 되돌리세요.",
+      evidence: weak.title,
+      priority: "high",
+      link: { kind: "segment", channel: weak.drill.channel, metric: "orders" },
+    });
+  }
+
+  // 4) 상품 흐름
+  const rising = byId("product-rising");
+  if (rising?.drill?.product) {
+    const m = productMomentum(ctx.rows, ctx.filters, ctx.derived).find((x) => x.product === rising.drill!.product);
     recs.push({
       id: "rec-stock",
-      title: "재고 확보",
-      description: `${product.title.split("'")[1] ? `'${product.title.split("'")[1]}'` : "성장 상품"} 매출이 상품 중 가장 빠르게 늘고 있습니다. 품절되지 않게 재고를 확보하고 노출을 늘리세요.`,
-      expectedEffect: "품절 리스크 감소",
+      title: `'${rising.drill.product}' 재고와 노출 확보`,
+      description:
+        m && m.unit === "orders"
+          ? `지금 속도라면 다음 7일에 약 ${formatNumber(m.recentOrders)}건이 팔립니다(최근 7일 기준 추정). 재고가 그만큼 있는지 확인하세요.`
+          : "판매 속도가 빨라졌습니다. 품절되지 않게 재고를 확인하고 노출 위치를 유지하세요.",
+      evidence: rising.title,
       priority: "medium",
+      link: { kind: "segment", product: rising.drill.product, metric: rising.drill.metric },
     });
   }
-  const conv = insights.find((i) => i.id === "conversion-trend");
-  if (conv?.impact === "negative") {
+  const falling = byId("product-falling");
+  if (falling?.drill?.product) {
     recs.push({
-      id: "rec-funnel",
-      title: "구매 퍼널 점검",
-      description: "전환율 하락 구간의 결제 단계 로그를 확인하고, 간편결제 노출을 우선 검토하세요.",
-      expectedEffect: "전환율 +0.3~0.6%p",
-      priority: "high",
+      id: "rec-product-falling",
+      title: `'${falling.drill.product}' 판매 둔화 원인 확인`,
+      description: "최근 가격·재고·노출 위치·리뷰에 바뀐 점이 있는지 확인하세요.",
+      evidence: falling.title,
+      priority: "medium",
+      link: { kind: "segment", product: falling.drill.product, metric: falling.drill.metric },
     });
   }
-  // 고객 데이터가 실제로 있을 때만 일반 리텐션 제안을 덧붙인다.
-  const hasCustomers = !(ctx.derived ?? []).some((f) => f === "customers" || f === "returningCustomers");
-  if (recs.length < 3 && hasCustomers) {
+
+  // 5) 늘어난 채널의 성장 요인 유지
+  const driver = byId("driver");
+  if (driver?.impact === "positive" && driver.drill) {
+    const dom = dominantFactor(segmentFactors(ctx, driver.drill));
+    if (dom) {
+      const name = driver.drill.channel ?? driver.drill.product!;
+      recs.push({
+        id: "rec-keep",
+        title: `${name}의 ${factorPhrase(dom)} 요인 유지`,
+        description: KEEP_BY_FACTOR[dom.key],
+        evidence: `${driver.title} (${dom.label} ${signed(dom.pct)})`,
+        priority: "medium",
+        link: { kind: "segment", ...driver.drill, metric: FACTOR_METRIC[dom.key] },
+      });
+    }
+  }
+
+  // 6) 재구매 비중 하락
+  const repeat = byId("repeat-share");
+  if (repeat?.impact === "negative") {
     recs.push({
       id: "rec-retention",
-      title: "리텐션 캠페인 준비",
-      description: "최근 30일 첫 구매 고객에게 2차 구매 유도 메시지를 예약 발송해보세요.",
-      expectedEffect: "재구매율 +2~3%p",
+      title: "첫 구매 고객의 재구매 안내 점검",
+      description: "최근 첫 구매 고객에게 재구매 안내(쿠폰·알림)가 나가고 있는지 확인하세요.",
+      evidence: repeat.title,
       priority: "low",
+      link: { kind: "segment", metric: "customers" },
     });
   }
-  return recs.slice(0, 4);
+
+  // 7) 채널 간 광고 효율 차이(증액 점검 제안이 없을 때만)
+  const roas = byId("ad-roas");
+  if (roas?.drill?.channel && !weak) {
+    recs.push({
+      id: "rec-budget",
+      title: `${roas.drill.channel} 광고 중 성과 낮은 집행부터 정리`,
+      description: "예산을 옮기기 전에, 이 채널에서 주문이 없던 캠페인·키워드부터 줄이는 안을 검토하세요.",
+      evidence: roas.title,
+      priority: "low",
+      link: { kind: "segment", channel: roas.drill.channel, metric: "revenue" },
+    });
+  }
+
+  return recs.sort((a, b) => RANK[a.priority] - RANK[b.priority]).slice(0, 4);
 }
 
-/** 자연어 질의 데모 엔진: 질문 키워드를 해석해 실제 데이터를 계산해 답한다. */
-export function answerDataQuestion(question: string, rows: DataRow[], derived: DerivedField[] = []): string {
-  const q = question.toLowerCase();
-  const filters = QA_FILTERS;
-  const shares = channelShares(rows, filters);
-  const { current, previous, currentDates } = applyFilters(rows, filters);
-  const comparable = isComparable(rows, filters);
-  const span = `최근 ${currentDates.length}일`;
-  const curRev = current.reduce((a, r) => a + r.revenue, 0);
-  const prevRev = previous.reduce((a, r) => a + r.revenue, 0);
-  const noCompare = "이전 같은 기간의 데이터가 없어 증감은 비교할 수 없습니다.";
-
-  if (/(잘\s*팔|인기|베스트|많이\s*팔)/.test(q) || (q.includes("상품") && q.includes("최고"))) {
-    const ranked = exploreSeries(rows, filters, "revenue", "product");
-    if (ranked.length < 2) return "상품 구분이 없는 데이터라 상품별 순위를 계산할 수 없습니다.";
-    const top = ranked[0];
-    const share = (top.value / ranked.reduce((a, r) => a + r.value, 0)) * 100;
-    return `${span} 기준 가장 잘 팔린 상품은 '${top.name}'입니다. 매출 ${formatKRW(top.value)}로 전체의 ${share.toFixed(0)}%를 차지합니다.`;
-  }
-  if (/(광고|roas|효율)/.test(q)) {
-    if (derived.includes("adSpend")) return "광고비 컬럼이 없는 데이터라 광고 효율을 계산할 수 없습니다.";
-    const roas = shares
-      .filter((s) => s.channel !== "기타")
-      .map((s) => {
-        const ad = current.filter((r) => r.channel === s.channel).reduce((a, r) => a + r.adSpend, 0);
-        return { channel: s.channel, roas: ad > 0 ? s.revenue / ad : 0 };
-      })
-      .filter((s) => s.roas > 0)
-      .sort((a, b) => b.roas - a.roas)[0];
-    return roas
-      ? `광고 효율(ROAS)이 가장 높은 채널은 ${roas.channel}입니다. ${span} 광고비 대비 ${roas.roas.toFixed(1)}배의 매출을 만들었습니다.`
-      : "광고비 데이터가 없어 효율을 계산할 수 없습니다.";
-  }
-  if (/(재구매|리텐션|단골)/.test(q)) {
-    if (derived.includes("returningCustomers") || derived.includes("customers"))
-      return "재구매 고객 컬럼이 없는 데이터라 재구매율을 계산할 수 없습니다.";
-    const rate = (list: DataRow[]) => {
-      const ret = list.reduce((a, r) => a + r.returningCustomers, 0);
-      const all = list.reduce((a, r) => a + r.customers, 0);
-      return all > 0 ? (ret / all) * 100 : 0;
-    };
-    const curRate = rate(current);
-    if (!comparable) return `${span} 재구매 고객 비중은 ${curRate.toFixed(1)}%입니다. ${noCompare}`;
-    const prevRate = rate(previous);
-    return `${span} 재구매 고객 비중은 ${curRate.toFixed(1)}%로, 이전 같은 기간(${prevRate.toFixed(1)}%)보다 ${Math.abs(curRate - prevRate).toFixed(1)}%p ${curRate >= prevRate ? "올랐습니다" : "내렸습니다"}.`;
-  }
-  if (/(다음\s*주|예상|예측|전망)/.test(q)) {
-    // 예측 화면과 같은 모델을 써서 숫자가 어긋나지 않게 한다.
-    const f = computeForecasts(rows)[0];
-    if (!f) return `예측하려면 최소 ${FORECAST_MIN_DAYS}일치 데이터가 필요합니다. 지금 데이터는 ${uniqueDates(rows).length}일치입니다.`;
-    return `다음 7일 매출은 약 ${formatKRW(f.next7Total)}로 예상됩니다. 직전 7일보다 ${Math.abs(f.changePct).toFixed(1)}% ${f.changePct >= 0 ? "많은" : "적은"} 수준이며, 최근 14일 추세를 반영한 단순 모델의 추정치입니다.`;
-  }
-  if (/(떨어|하락|감소|왜)/.test(q) && /(매출|주문)/.test(q)) {
-    if (!comparable) return `${span} 매출은 ${formatKRW(curRev)}입니다. ${noCompare}`;
-    const totalDelta = prevRev > 0 ? ((curRev - prevRev) / prevRev) * 100 : 0;
-    const drop = shares.length > 1 ? [...shares].sort((a, b) => a.changePct - b.changePct)[0] : null;
-    if (totalDelta >= 0) {
-      return `${span} 매출은 이전 같은 기간보다 ${totalDelta.toFixed(1)}% 늘어 하락 구간은 아닙니다.${
-        drop && drop.changePct < 0 ? ` 다만 ${drop.channel} 채널의 비중이 ${Math.abs(drop.changePct).toFixed(1)}%p 줄어 유입·전환 점검을 권합니다.` : ""
-      }`;
-    }
-    return `${span} 매출은 이전 같은 기간보다 ${Math.abs(totalDelta).toFixed(1)}% 줄었습니다.${
-      drop ? ` 비중이 가장 많이 줄어든 채널은 ${drop.channel}(${Math.abs(drop.changePct).toFixed(1)}%p)입니다.` : ""
-    }`;
-  }
-  if (/(채널|비중)/.test(q)) {
-    if (shares.length < 2) return "채널 구분이 없는 데이터라 채널별 비중을 계산할 수 없습니다.";
-    const top = shares[0];
-    return `${span} 매출 비중이 가장 큰 채널은 ${top.channel}(${top.share.toFixed(1)}%)입니다.${
-      comparable ? ` 이전 같은 기간보다 비중이 ${Math.abs(top.changePct).toFixed(1)}%p ${top.changePct >= 0 ? "늘었습니다" : "줄었습니다"}.` : ""
-    }`;
-  }
-  // 기본 요약 응답
-  const delta = prevRev > 0 ? ((curRev - prevRev) / prevRev) * 100 : 0;
-  return `${span} 매출은 ${formatKRW(curRev)}${
-    comparable ? `로 이전 같은 기간보다 ${Math.abs(delta).toFixed(1)}% ${delta >= 0 ? "늘었습니다" : "줄었습니다"}` : "입니다"
-  }. "가장 잘 팔린 상품은?", "광고 효율이 가장 높은 채널은?"처럼 물어보세요.`;
+/** 기간 설명 — "최근 30일" */
+export function spanLabel(rows: DataRow[], filters: Filters): string {
+  const n = resolveDates(rows, filters).currentDates.length;
+  return filters.preset === "custom" ? `선택한 ${n}일` : `최근 ${n}일`;
 }
 
-export const SUGGESTED_QUESTIONS = [
-  "지난달 매출이 왜 떨어졌어?",
-  "가장 잘 팔린 상품은?",
-  "광고 효율이 가장 높은 채널은?",
-  "재구매율은 어떻게 변했어?",
-  "다음주 매출을 예상해줘",
-];
+export type { Contribution };

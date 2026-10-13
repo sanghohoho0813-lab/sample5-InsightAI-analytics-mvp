@@ -7,9 +7,9 @@ import FilterToolbar from "@/components/FilterToolbar";
 import EmptyState from "@/components/EmptyState";
 import { Panel } from "@/components/Panel";
 import ForecastChart from "@/components/charts/ForecastChart";
-import { filterDimensions } from "@/lib/analytics-engine";
 import { useApp } from "@/lib/store";
-import { computeForecasts, FORECAST_MIN_DAYS } from "@/lib/forecast-engine";
+import { FORECAST_MIN_DAYS } from "@/lib/forecast-engine";
+import { forecastsFor } from "@/lib/dataset-meta";
 import Link from "next/link";
 import { btn } from "@/lib/ui";
 import { formatKRW, formatNumber } from "@/lib/format";
@@ -20,7 +20,7 @@ export default function ForecastPage() {
   const [active, setActive] = useState<ForecastSummary["key"]>("revenue");
 
   const forecasts = useMemo(
-    () => (dataset ? computeForecasts(filterDimensions(dataset.rows, filters)) : []),
+    () => (dataset ? forecastsFor(dataset, filters) : []),
     [dataset, filters]
   );
 

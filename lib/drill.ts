@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { useApp } from "./store";
 import { ALL_NAV } from "./nav";
-import { MetricKey } from "./types";
+import { ActionLink, MetricKey } from "./types";
 
 function shiftDate(date: string, days: number): string {
   const d = new Date(date + "T00:00:00Z");
@@ -42,5 +42,27 @@ export function useDrill() {
     [router, setCustomRange, setFilters, beginDrill, pathname, fromLabel]
   );
 
-  return { toSegment, toMoment };
+  /** 이상치 조사 화면 — 출발한 화면을 기억해 '돌아가기'에 쓴다 */
+  const toInvestigation = useCallback(
+    (id: string) => {
+      const from = pathname === "/anomalies" ? "" : `&from=${encodeURIComponent(pathname)}`;
+      router.push(`/anomalies?id=${encodeURIComponent(id)}${from}`);
+    },
+    [router, pathname]
+  );
+
+  /** 브리핑·실행 제안·질의 답변의 '이어서 볼 화면' */
+  const follow = useCallback(
+    (link: ActionLink, label?: string) => {
+      if (link.kind === "anomaly") toInvestigation(link.id);
+      else toSegment({ channel: link.channel, product: link.product, metric: link.metric }, label);
+    },
+    [toInvestigation, toSegment]
+  );
+
+  return { toSegment, toMoment, toInvestigation, follow };
 }
+
+/** 이상치 조사 화면 주소 */
+export const investigationHref = (id: string, from?: string) =>
+  `/anomalies?id=${encodeURIComponent(id)}${from ? `&from=${encodeURIComponent(from)}` : ""}`;

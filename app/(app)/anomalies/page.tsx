@@ -1,22 +1,75 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import FilterToolbar from "@/components/FilterToolbar";
 import EmptyState from "@/components/EmptyState";
 import AnomalyList from "@/components/AnomalyList";
+import InvestigationView from "@/components/InvestigationView";
 import { Panel } from "@/components/Panel";
 import { useApp } from "@/lib/store";
 import { ANOMALY_MIN_DAYS } from "@/lib/anomaly-engine";
+import { uniqueDates } from "@/lib/analytics-engine";
 import { anomaliesFor } from "@/lib/dataset-meta";
 import { recentAlerts } from "@/lib/notifications";
-import { Severity } from "@/lib/types";
+import { DemoDataset, Filters, Severity } from "@/lib/types";
 import { SEVERITY_META, btn } from "@/lib/ui";
 
 type Tab = "all" | Severity;
 
+/** 조사 화면에서 열 이상치 — 지금 범위에서 먼저 찾고, 없으면 전체 기간에서 찾는다(다른 범위에서 저장한 링크 대비). */
+function findAnomaly(ds: DemoDataset, filters: Filters, id: string) {
+  const inScope = anomaliesFor(ds, filters).find((a) => a.id === id);
+  if (inScope) return inScope;
+  const dates = uniqueDates(ds.rows);
+  const all: Filters = { ...filters, preset: "custom", rangeDays: dates.length, range: { start: dates[0], end: dates[dates.length - 1] } };
+  return anomaliesFor(ds, all).find((a) => a.id === id) ?? null;
+}
+
+function Investigation({ id, from }: { id: string; from: string | null }) {
+  const { ready, dataset, filters } = useApp();
+  const anomaly = useMemo(() => (dataset ? findAnomaly(dataset, filters, id) : null), [dataset, filters, id]);
+  if (!ready) return <PageSkeleton />;
+  if (!dataset) {
+    return (
+      <>
+        <PageHeader title="변화 조사" />
+        <EmptyState />
+      </>
+    );
+  }
+  if (!anomaly) {
+    return (
+      <>
+        <PageHeader title="이 변화를 찾을 수 없습니다" description="데이터나 범위가 바뀌어 지금은 감지되지 않는 변화입니다." />
+        <Link href="/anomalies" className={btn.secondary}>
+          이상 감지 목록으로
+        </Link>
+      </>
+    );
+  }
+  return <InvestigationView anomaly={anomaly} from={from && from.startsWith("/") ? from : null} />;
+}
+
+function AnomaliesView() {
+  const params = useSearchParams();
+  const id = params.get("id");
+  if (id) return <Investigation id={id} from={params.get("from")} />;
+  return <AnomalyLibrary />;
+}
+
 export default function AnomaliesPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <AnomaliesView />
+    </Suspense>
+  );
+}
+
+function AnomalyLibrary() {
   const { ready, dataset, filters, readIds, markRead } = useApp();
   const [tab, setTab] = useState<Tab>("all");
 
@@ -61,7 +114,7 @@ export default function AnomaliesPage() {
             ? new Set(dataset.rows.map((r) => r.date)).size < ANOMALY_MIN_DAYS
               ? `급증·급감을 찾으려면 ${ANOMALY_MIN_DAYS}일 이상의 데이터가 필요합니다.`
               : "이 범위에서는 감지된 변화가 없습니다."
-            : `${anomalies.length}건 감지 · 위험 ${counts.critical}건, 주의 ${counts.warning}건${unreadIds.size ? ` · 미확인 ${unreadIds.size}건` : ""}`
+            : `${anomalies.length}건 · 위험 ${counts.critical}건, 주의 ${counts.warning}건${unreadIds.size ? ` · 미확인 ${unreadIds.size}건` : ""} · 누르면 원인 조사 화면으로 갑니다`
         }
         actions={
           unreadIds.size > 0 ? (
@@ -99,7 +152,8 @@ export default function AnomaliesPage() {
       </Panel>
 
       <p className="mt-4 text-meta text-ink-dim">
-        감지 기준: 전일 대비 ±30% 이상, 또는 직전 7일 평균에서 크게 벗어난 날. 같은 날 함께 움직인 지표는 한 건으로 묶고, 급감 직후의 반등은 따로 알리지 않습니다.
+        감지 기준: 평소 수준(직전 7일 중앙값)과 최근 4주 같은 요일 수준 모두에서 20% 이상(전환율·객단가는 15%) 벗어난 날.
+        주말처럼 원래 반복되는 패턴과 프로모션이 끝나 평소로 돌아온 날은 알리지 않고, 며칠 이어진 변화는 한 건으로 묶습니다.
       </p>
     </>
   );

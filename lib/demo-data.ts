@@ -40,6 +40,8 @@ interface StoryEvent {
   visitorMul?: number;
   convMul?: number;
   aovMul?: number;
+  /** 광고비 배수 — 매출과 무관하게 광고비만 바뀐 경우 */
+  adMul?: number;
 }
 
 interface GenSpec {
@@ -72,6 +74,7 @@ function generate(spec: GenSpec): DataRow[] {
       let conv = ch.conv;
       let aov = ch.aov;
       let visitorMul = 1;
+      let adMul = 1;
 
       for (const ev of spec.events) {
         if (di >= ev.from && di <= ev.to && (!ev.channel || ev.channel === ch.name)) {
@@ -79,6 +82,7 @@ function generate(spec: GenSpec): DataRow[] {
           if (ev.convMul) conv *= ev.convMul;
           if (ev.aovMul) aov *= ev.aovMul;
           if (ev.visitorMul) visitorMul *= ev.visitorMul;
+          if (ev.adMul) adMul *= ev.adMul;
         }
       }
 
@@ -102,7 +106,7 @@ function generate(spec: GenSpec): DataRow[] {
         const visitors = Math.max(orders, Math.round((orders / (rowConv / 100)) * visitorMul));
         const customers = Math.max(1, Math.round(orders * (0.82 + rand() * 0.08)));
         const returning = Math.round(customers * (0.34 + rand() * 0.08 + 0.06 * t));
-        const adSpend = Math.round(revenue * ch.adRatio * (0.85 + rand() * 0.3));
+        const adSpend = Math.round(revenue * ch.adRatio * adMul * (0.85 + rand() * 0.3));
 
         rows.push({
           date,
@@ -146,6 +150,7 @@ const ago = (n: number) => DAYS - 1 - n;
  * - 11~7일 전: 모바일 결제 이탈 증가
  * - 6일 전~오늘: 검색광고 유입(웹사이트) 전환율 개선, 객단가 상승
  * - 최근 2주: "비타민 세럼" 판매 가속
+ * - 최근 4주: 스마트스토어 광고비 증액(주문은 그만큼 늘지 않음)
  */
 function ecommerceRows(endDate: string): DataRow[] {
   return generate({
@@ -177,6 +182,8 @@ function ecommerceRows(endDate: string): DataRow[] {
       // 6일 전~오늘: 검색광고 전환 개선 + 객단가 상승
       { from: ago(6), to: ago(0), channel: "웹사이트", convMul: 1.22, revenueMul: 1.14, aovMul: 1.1 },
       { from: ago(6), to: ago(0), aovMul: 1.08 },
+      // 최근 4주: 스마트스토어 광고비만 증액
+      { from: ago(27), to: ago(0), channel: "스마트스토어", adMul: 1.4 },
     ],
   });
 }
@@ -204,6 +211,8 @@ function marketingRows(endDate: string): DataRow[] {
       { from: ago(34), to: ago(27), channel: "SNS 광고", revenueMul: 1.28 },
       { from: ago(15), to: ago(15), channel: "디스플레이", revenueMul: 0.55, visitorMul: 0.6 },
       { from: ago(11), to: ago(0), channel: "검색 광고", convMul: 1.25, revenueMul: 1.12 },
+      // 최근 3주: SNS 광고 집행비 증액(성과는 제자리)
+      { from: ago(20), to: ago(0), channel: "SNS 광고", adMul: 1.45 },
     ],
   });
 }
@@ -228,7 +237,7 @@ function retailRows(endDate: string): DataRow[] {
       { name: "원두/굿즈", share: 0.2 },
     ],
     events: [
-      { from: ago(29), to: ago(23), revenueMul: 1.22 },
+      { from: ago(29), to: ago(23), revenueMul: 1.3 },
       { from: ago(19), to: ago(16), channel: "홍대점", revenueMul: 0.68, visitorMul: 0.7 },
       { from: ago(9), to: ago(0), channel: "강남점", aovMul: 1.15, revenueMul: 1.1 },
     ],

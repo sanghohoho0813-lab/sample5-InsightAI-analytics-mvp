@@ -1,11 +1,10 @@
-import { answerDataQuestion } from "../insight-generator";
+import { answerQuestion, QaAnswer } from "../qa";
 import { DemoDataset, Filters } from "../types";
 import { AiResponse } from "./contract";
 import { buildAiContext } from "./context";
 
-export interface Answer {
-  text: string;
-  /** 누가 답했는지 — 화면에 그대로 밝힌다 */
+export interface Answer extends QaAnswer {
+  /** 누가 문장을 만들었는지 — 화면에 그대로 밝힌다(근거·링크는 항상 규칙 기반 계산) */
   source: "llm" | "rules";
 }
 
@@ -37,7 +36,8 @@ async function askRemote(question: string, ds: DemoDataset, filters: Filters): P
  * 없거나 실패하면 같은 계산을 쓰는 규칙 기반 엔진이 답한다.
  */
 export async function askDataQuestion(question: string, ds: DemoDataset, filters: Filters): Promise<Answer> {
+  // 근거와 이어 볼 화면은 화면과 같은 계산(규칙 기반)에서 만든다. LLM은 문장만 바꾼다.
+  const rules = answerQuestion(question, ds, filters);
   const remote = await askRemote(question, ds, filters);
-  if (remote) return { text: remote, source: "llm" };
-  return { text: answerDataQuestion(question, ds.rows, ds.derived), source: "rules" };
+  return remote ? { ...rules, text: remote, source: "llm" } : { ...rules, source: "rules" };
 }

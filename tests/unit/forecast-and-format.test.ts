@@ -47,3 +47,18 @@ describe("format", () => {
     expect(formatAxisKRW(250_000_000)).toBe("2.5억");
   });
 });
+
+describe("josa — 받침에 맞는 조사", () => {
+  it("한글·숫자·기호 끝에 맞는 조사를 고른다", async () => {
+    const { josa, formatMonthDay } = await import("@/lib/format");
+    expect(josa("₩7.3억", "으로")).toBe("₩7.3억으로");
+    expect(josa("₩1,200", "으로")).toBe("₩1,200으로"); // 영
+    expect(josa("3.5%", "으로")).toBe("3.5%로"); // 퍼센트
+    expect(josa("서울", "으로")).toBe("서울로"); // ㄹ 받침
+    expect(josa("이메일", "이")).toBe("이메일이");
+    expect(josa("웹사이트", "이")).toBe("웹사이트가");
+    expect(josa("'세럼'", "은")).toBe("'세럼'은");
+    expect(formatMonthDay("2026-10-02")).toBe("10월 2일");
+  });
+});
+

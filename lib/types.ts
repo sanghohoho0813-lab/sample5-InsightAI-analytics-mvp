@@ -64,19 +64,47 @@ export interface ChannelShare {
 
 export type Severity = "critical" | "warning" | "info";
 
+/** 이상치가 잡힌 지표 하나의 근거 — 가장 크게 벗어난 날의 값과 평소 수준 */
+export interface AnomalyMetric {
+  key: string;
+  label: string;
+  /** 이 지표가 가장 크게 벗어난 날 */
+  date: string;
+  value: number;
+  /** 평소 수준(최근 7일 중앙값) */
+  expected: number;
+  deltaPct: number;
+}
+
 export interface Anomaly {
   id: string;
   severity: Severity;
   title: string;
   description: string;
   metric: string;
+  /** 변화가 시작된 날 */
   date: string;
+  /** 변화가 마지막으로 감지된 날(하루짜리면 date와 같다) */
+  endDate: string;
+  /** 이어진 일수 */
+  days: number;
+  /** 데이터 마지막 날까지 이어지고 있는지 */
+  ongoing: boolean;
+  direction: "up" | "down";
   deltaPct: number;
   detail: string;
   /** 원인 채널(전체 합계에서 감지되면 없음) */
   channel?: string;
   /** 분석 화면에서 열 지표 */
   metricKey: MetricKey;
+  metrics: AnomalyMetric[];
+}
+
+/** 분석 화면의 범위·지표로 들어가는 드릴다운 대상 */
+export interface DrillTarget {
+  channel?: string;
+  product?: string;
+  metric?: MetricKey;
 }
 
 export interface Insight {
@@ -84,21 +112,33 @@ export interface Insight {
   category: string;
   title: string;
   description: string;
-  detail: string;
+  /** 결론을 확인할 수 있는 계산값 — "웹사이트 ₩3.1억 → ₩4.3억 (+39%)" */
+  evidence: string[];
+  /** 계산 방식 — 추정이 섞였으면 그렇다고 밝힌다 */
+  basis: string;
   impact: "positive" | "negative" | "neutral";
   /** "관련 데이터 보기" 드릴다운 대상 — 분석 화면의 필터·지표로 연결된다. */
-  drill?: { channel?: string; product?: string; metric?: MetricKey };
+  drill?: DrillTarget;
 }
 
 /** 분석 화면에서 선택 가능한 핵심 지표 */
 export type MetricKey = "revenue" | "orders" | "customers" | "conversion" | "aov";
 
+/** 실행 제안·브리핑 항목에서 이어지는 화면 */
+export type ActionLink =
+  | { kind: "anomaly"; id: string }
+  | ({ kind: "segment" } & DrillTarget);
+
 export interface Recommendation {
   id: string;
+  /** 해야 할 일 — 동사로 끝나는 구체적인 행동 */
   title: string;
+  /** 어떻게 확인·실행하는지 */
   description: string;
-  expectedEffect: string;
+  /** 왜 — 이 제안을 만든 계산값 */
+  evidence: string;
   priority: "high" | "medium" | "low";
+  link?: ActionLink;
 }
 
 export interface ForecastPoint {
@@ -135,7 +175,20 @@ export interface AnalysisRecord {
   restorable: boolean;
 }
 
-/** 저장된 보고서 — 저장 시점의 계산 결과를 스냅샷으로 보관해 나중에 그대로 다시 연다. */
+/** 보고서에 남기는 브리핑 항목 한 줄 */
+export interface BriefSnapshot {
+  title: string;
+  body: string;
+  evidence?: string[];
+  basis?: string;
+  tone: "positive" | "negative" | "neutral";
+}
+
+/**
+ * 저장된 보고서 — 특정 시점의 분석 결론을 남긴 업무 기록.
+ * 저장 시점의 계산 결과를 스냅샷으로 보관해, 데이터가 바뀌어도 그때의 결론을 그대로 다시 연다.
+ * (v2 이전에 저장된 보고서는 brief·comparison·data가 없을 수 있다)
+ */
 export interface SavedReport {
   id: string;
   title: string;
@@ -145,12 +198,24 @@ export interface SavedReport {
   /** 동일 조건 중복 저장 판단용 (데이터셋·기간·채널·상품) */
   signature: string;
   scope: { start: string; end: string; days: number; channel: string; product: string };
+  /** "최근 30일 · 이전 30일과 비교" */
+  comparison?: string;
   headline: string;
+  brief?: { change?: BriefSnapshot; cause?: BriefSnapshot; risk?: BriefSnapshot };
+  /** 분석에 쓴 데이터 — 출처·행 수·마지막 날짜·추정으로 채운 컬럼 */
+  data?: { source: "demo" | "upload"; rows: number; days: number; lastDate: string; estimated: string[] };
   kpis: { key: string; label: string; value: number; prevValue: number; changePct: number; format: KpiResult["format"]; comparable?: boolean }[];
-  findings: { title: string; description: string; impact: Insight["impact"] }[];
-  anomalies: { title: string; description: string; severity: Severity; date: string }[];
+  findings: { title: string; description: string; impact: Insight["impact"]; evidence?: string[]; basis?: string }[];
+  anomalies: { title: string; description: string; severity: Severity; date: string; days?: number; ongoing?: boolean }[];
   forecasts: { label: string; next7Total: number; changePct: number; format: "currency" | "number" }[];
-  recommendations: { title: string; description: string; expectedEffect: string; priority: Recommendation["priority"] }[];
+  recommendations: {
+    title: string;
+    description: string;
+    evidence?: string;
+    /** v1 보고서의 예상 효과(추정) */
+    expectedEffect?: string;
+    priority: Recommendation["priority"];
+  }[];
 }
 
 export interface AppSettings {

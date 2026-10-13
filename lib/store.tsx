@@ -16,6 +16,8 @@ import {
   storeUpload,
   writeJson,
 } from "./persist";
+import { fitPreset } from "./capabilities";
+import { josa } from "./format";
 import { buildReport, keyFinding } from "./report";
 import { AnalysisRecord, AppSettings, DemoDataset, Filters, SavedReport } from "./types";
 
@@ -91,6 +93,10 @@ const filtersFor = (preset: AppSettings["defaultPreset"]): Filters => ({
   product: "all",
 });
 
+/** 데이터 길이에 맞춘 기본 범위 — 짧은 파일도 처음부터 이전 기간과 비교되도록 */
+const filtersForData = (ds: DemoDataset | null, preset: AppSettings["defaultPreset"]): Filters =>
+  filtersFor(ds ? fitPreset(new Set(ds.rows.map((r) => r.date)).size, preset) : preset);
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -111,7 +117,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const s = { ...DEFAULT_SETTINGS, ...readJson<Partial<AppSettings>>(KEYS.settings, {}) };
     setSettings(s);
-    setFiltersState(filtersFor(s.defaultPreset));
     setHistory(readList<AnalysisRecord>(KEYS.history, isValidRecord));
     setReports(readList<SavedReport>(KEYS.reports, isValidReport));
     setReadIds(readList<string>(KEYS.read, (x) => typeof x === "string"));
@@ -119,7 +124,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const active = readJson<{ id?: string } | null>(KEYS.active, null);
     const restored = active?.id ? findDataset(active.id) : null;
     // 어느 주소로 처음 들어와도 빈 화면이 아니도록 기본 샘플 데이터를 연결한다.
-    setDataset(restored ?? getDemoDatasets()[0]);
+    const initial = restored ?? getDemoDatasets()[0];
+    setDataset(initial);
+    setFiltersState(filtersForData(initial, s.defaultPreset));
     setReady(true);
   }, []);
 
@@ -150,11 +157,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resetFilters = useCallback(() => {
-    setFiltersState(filtersFor(settings.defaultPreset));
-  }, [settings.defaultPreset]);
+    setFiltersState(filtersForData(dataset, settings.defaultPreset));
+  }, [dataset, settings.defaultPreset]);
 
   const markRead = useCallback((ids: string[]) => {
     setReadIds((prev) => {
+      if (ids.every((id) => prev.includes(id))) return prev;
       const next = Array.from(new Set([...prev, ...ids])).slice(-300);
       writeJson(KEYS.read, next);
       return next;
@@ -184,7 +192,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const ds = same ? { ...input, id: same.id } : input;
           const restorable = isUpload ? storeUpload(ds) : true;
           if (isUpload) setUploads(readUploads());
-          const nextFilters = filtersFor(settings.defaultPreset);
+          const nextFilters = filtersForData(ds, settings.defaultPreset);
           activate(ds);
           setFiltersState(nextFilters);
           const record: AnalysisRecord = {
@@ -225,7 +233,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       activate(ds);
-      setFiltersState(filtersFor(settings.defaultPreset));
+      setFiltersState(filtersForData(ds, settings.defaultPreset));
       router.push("/dashboard");
       showToast(`'${record.datasetName}' 분석을 다시 열었습니다.`, "info");
     },
@@ -312,8 +320,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (ds: DemoDataset) => {
       activate(ds);
       setDrill(null);
-      setFiltersState(filtersFor(settings.defaultPreset));
-      showToast(`'${ds.name}'(으)로 바꿨습니다.`, "info");
+      setFiltersState(filtersForData(ds, settings.defaultPreset));
+      showToast(`${josa(`'${ds.name}'`, "으로")} 바꿨습니다.`, "info");
     },
     [activate, settings.defaultPreset, showToast]
   );

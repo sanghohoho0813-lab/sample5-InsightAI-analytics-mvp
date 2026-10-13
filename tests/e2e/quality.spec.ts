@@ -1,11 +1,25 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, Page, test } from "@playwright/test";
 
 const PAGES = ["/dashboard", "/anomalies", "/insights", "/analytics", "/forecast", "/reports", "/data", "/ai", "/settings", "/more", "/intro"];
 
-for (const path of PAGES) {
-  test(`${path}: 접근성 위반(심각·치명) 없음, 가로 넘침 없음`, async ({ page }) => {
+/** 조사 화면처럼 목록에서 들어가야 하는 화면 — 시작 주소와 들어가는 방법 */
+const FLOWS: { name: string; path: string; enter?: (page: Page) => Promise<void> }[] = [
+  ...PAGES.map((path) => ({ name: path, path })),
+  {
+    name: "/anomalies?id= (조사 화면)",
+    path: "/anomalies",
+    enter: async (page) => {
+      await page.locator('a[href^="/anomalies?id="]').first().click();
+      await expect(page.getByRole("heading", { level: 2, name: /지금 할 일/ })).toBeVisible();
+    },
+  },
+];
+
+for (const { name, path, enter } of FLOWS) {
+  test(`${name}: 접근성 위반(심각·치명) 없음, 가로 넘침 없음`, async ({ page }) => {
     await page.goto(path);
+    await enter?.(page);
     await page.waitForLoadState("networkidle");
 
     const { violations } = await new AxeBuilder({ page })

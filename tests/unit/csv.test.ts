@@ -61,11 +61,90 @@ describe("toDataRows", () => {
   it("필수 컬럼이 없으면 오류를 돌려준다", () => {
     expect(table("Day,Revenue\n2026-09-01,1").error).toBeUndefined(); // day는 날짜 별칭
     expect(table("When,Value\n2026-09-01,1").error).toMatch(/날짜·매출/);
-    expect(table("Date,Value\n2026-09-01,1").error).toMatch(/날짜·매출/);
+    expect(table("Date,Value\n2026-09-01,1").error).toMatch(/^매출 열을 찾지 못했습니다/);
   });
 
   it("행을 날짜순으로 정렬한다", () => {
     expect(table("Date,Revenue\n2026-09-03,1\n2026-09-01,1").rows.map((x) => x.date)).toEqual(["2026-09-01", "2026-09-03"]);
+  });
+});
+
+describe("toDataRows — 데이터 진단", () => {
+  const issue = (r: ReturnType<typeof table>, re: RegExp) => r.issues?.find((i) => re.test(i.title));
+
+  it("위에 제목 줄이 있으면 날짜·매출 헤더가 있는 줄을 찾아 읽는다", () => {
+    const r = table("3분기 판매 실적\n작성: 영업팀\n날짜,매출\n2026-09-01,1000");
+    expect(r.error).toBeUndefined();
+    expect(r.rows).toHaveLength(1);
+    expect(issue(r, /위쪽 2줄은 제목/)).toBeTruthy();
+  });
+
+  it("열마다 무엇으로 인식했는지 알려주고, 모르는 열은 쓰지 않는다", () => {
+    const r = table("날짜,매출액,메모\n2026-09-01,1000,x");
+    expect(r.mapping?.map((m) => [m.column, m.label])).toEqual([
+      ["날짜", "날짜"],
+      ["매출액", "매출"],
+      ["메모", null],
+    ]);
+  });
+
+  it("없는 날짜(2026-02-30, 13월)는 읽지 않고 행 번호와 함께 알려준다", () => {
+    const r = table("날짜,매출\n2026-09-01,1\n2026-02-30,1\n2026-13-01,1");
+    expect(r.rows).toHaveLength(1);
+    expect(issue(r, /날짜를 읽지 못한 2행/)?.detail).toMatch(/3행 '2026-02-30', 4행 '2026-13-01'/);
+  });
+
+  it("매출이 비었거나 숫자가 아닌 행은 0으로 채우지 않고 제외한다", () => {
+    const r = table("날짜,매출\n2026-09-01,1000\n2026-09-02,\n2026-09-03,N/A\n2026-09-04,\"1,200원\"");
+    expect(r.rows.map((x) => x.revenue)).toEqual([1000, 1200]);
+    expect(issue(r, /매출이 비었거나 숫자가 아닌 2행/)).toBeTruthy();
+  });
+
+  it("완전히 같은 행은 한 번만 반영하고 알려준다", () => {
+    const r = table("날짜,채널,매출\n2026-09-01,웹,1000\n2026-09-01,웹,1000\n2026-09-01,앱,1000");
+    expect(r.rows).toHaveLength(2);
+    expect(issue(r, /완전히 같은 행 1개/)).toBeTruthy();
+  });
+
+  it("값이 전부 빈 열은 없는 열로 보고, 그 지표를 추정치로 표시한다", () => {
+    const r = table("날짜,매출,광고비\n2026-09-01,1000,\n2026-09-02,1000,");
+    expect(r.derived).toContain("adSpend");
+    expect(issue(r, /광고비 열이 비어 있습니다/)).toBeTruthy();
+  });
+
+  it("기록이 없는 날과 짧은 기간을 알려준다", () => {
+    const r = table("날짜,매출\n2026-09-01,1\n2026-09-02,1\n2026-09-05,1");
+    expect(r.period).toEqual({ start: "2026-09-01", end: "2026-09-05", days: 3, missing: 2 });
+    expect(issue(r, /기간 중 2일은 데이터가 없습니다/)?.detail).toMatch(/9월 3일, 9월 4일/);
+    expect(issue(r, /3일치 데이터라/)).toBeTruthy();
+  });
+
+  it("같은 항목으로 보이는 열이 둘이면 앞의 열만 쓴다", () => {
+    const r = table("날짜,매출,매출액\n2026-09-01,1000,9999");
+    expect(r.rows[0].revenue).toBe(1000);
+    expect(r.mapping?.[2].duplicate).toBe(true);
+  });
+});
+
+describe("capabilities — 이 데이터로 할 수 있는 분석", () => {
+  it("열과 기간에 따라 가능·불가와 그 이유를 알려준다", async () => {
+    const { capabilities } = await import("@/lib/capabilities");
+    const r = table("날짜,매출\n" + Array.from({ length: 10 }, (_, i) => `2026-09-${String(i + 1).padStart(2, "0")},1000`).join("\n"));
+    const caps = Object.fromEntries(capabilities(r.rows, r.derived).map((c) => [c.label, c]));
+    expect(caps["매출 추이"].ok).toBe(true);
+    expect(caps["급변 감지"].ok).toBe(true);
+    expect(caps["7일 매출 예측"]).toMatchObject({ ok: false, note: "14일 이상 필요합니다(지금 10일)" });
+    expect(caps["광고 효율"]).toMatchObject({ ok: false, note: "광고비 열이 없습니다" });
+    expect(caps["채널별 비교"].note).toBe("채널 열이 없습니다");
+  });
+
+  it("이전 기간과 비교할 수 있게 데이터 길이에 맞는 기본 기간을 고른다", async () => {
+    const { fitPreset } = await import("@/lib/capabilities");
+    expect(fitPreset(90, "30")).toBe("30");
+    expect(fitPreset(59, "30")).toBe("7");
+    expect(fitPreset(10, "30")).toBe("30");
+    expect(fitPreset(200, "90")).toBe("90");
+    expect(fitPreset(100, "90")).toBe("30");
   });
 });
 

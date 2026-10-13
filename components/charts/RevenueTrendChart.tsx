@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { aggregateSeries } from "@/lib/analytics-engine";
-import { formatAxisKRW, formatDateKR, formatDateShort, formatKRWExact, formatNumber } from "@/lib/format";
+import { formatAxisKRW, formatDateKR, formatDateShort, formatKRW, formatKRWExact, formatNumber } from "@/lib/format";
 import { DailyPoint } from "@/lib/types";
 import ChartTooltip from "./ChartTooltip";
 import { COLORS } from "@/lib/palette";
@@ -28,12 +28,13 @@ const UNITS: { value: Unit; label: string }[] = [
 
 const METRIC_META: Record<
   MetricKey,
-  { key: keyof DailyPoint; label: string; full: (v: number) => string; axis: (v: number) => string }
+  { key: keyof DailyPoint; label: string; full: (v: number) => string; axis: (v: number) => string; short?: (v: number) => string }
 > = {
   revenue: {
     key: "revenue",
     label: "매출",
     full: formatKRWExact,
+    short: formatKRW,
     axis: (v) => formatAxisKRW(v),
   },
   orders: { key: "orders", label: "주문 수", full: (v) => `${formatNumber(v)}건`, axis: formatNumber },
@@ -55,11 +56,14 @@ export default function RevenueTrendChart({
   points,
   metric = "revenue",
   markDate,
+  header,
 }: {
   points: DailyPoint[];
   metric?: MetricKey;
   /** 이상치 발생일처럼 강조할 날짜(일간 보기에서만 표시) */
   markDate?: string;
+  /** 지표 탭처럼 제목 대신 둘 머리 영역 */
+  header?: React.ReactNode;
 }) {
   const [unit, setUnit] = useState<Unit>("day");
   const [selected, setSelected] = useState<DailyPoint | null>(null);
@@ -76,12 +80,25 @@ export default function RevenueTrendChart({
 
   const labelFor = (d: string) => (unit === "month" ? d.replace("-", ".") : formatDateShort(d));
 
+  // 차트 아래 한 줄 요약 — 좁은 화면에서도 촘촘한 선을 읽지 않고 핵심 숫자를 알 수 있게
+  const stats = useMemo(() => {
+    const vals = data.map((p) => ({ date: p.date, v: p[meta.key] as number }));
+    if (vals.length < 2) return null;
+    const hi = vals.reduce((a, b) => (b.v > a.v ? b : a));
+    const lo = vals.reduce((a, b) => (b.v < a.v ? b : a));
+    const avg = vals.reduce((a, b) => a + b.v, 0) / vals.length;
+    return { hi, lo, avg };
+  }, [data, meta.key]);
+  const unitWord = unit === "day" ? "일" : unit === "week" ? "주" : "월";
+  const when = (d: string) => (unit === "month" ? `${Number(d.slice(5, 7))}월` : unit === "week" ? `${formatDateShort(d)} 주` : formatDateShort(d));
+
   return (
     <section className="card flex h-full flex-col p-5 md:p-6" aria-label={`${meta.label} 추이`}>
+      {header}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-card font-bold text-ink">{meta.label} 추이</h2>
-          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-ink-soft">
+          <h2 className={header ? "sr-only" : "text-card font-bold text-ink"}>{meta.label} 추이</h2>
+          <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-ink-soft ${header ? "" : "mt-1"}`}>
             <span className="flex items-center gap-1.5">
               <span className="h-[3px] w-4 rounded-full" style={{ background: c.base }} /> {meta.label}
             </span>
@@ -112,7 +129,7 @@ export default function RevenueTrendChart({
         </div>
       </div>
 
-      <div className="h-[260px] md:h-[320px]">
+      <div className="h-[220px] sm:h-[260px] md:h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={data}
@@ -182,6 +199,20 @@ export default function RevenueTrendChart({
           </AreaChart>
         </ResponsiveContainer>
       </div>
+
+      {stats && !selected && (
+        <p className="tabular mt-3 flex flex-wrap gap-x-4 gap-y-1 text-meta text-ink-soft">
+          <span>
+            최고 <b className="font-semibold text-ink">{(meta.short ?? meta.full)(stats.hi.v)}</b> <span className="text-ink-dim">({when(stats.hi.date)})</span>
+          </span>
+          <span>
+            최저 <b className="font-semibold text-ink">{(meta.short ?? meta.full)(stats.lo.v)}</b> <span className="text-ink-dim">({when(stats.lo.date)})</span>
+          </span>
+          <span>
+            {unitWord} 평균 <b className="font-semibold text-ink">{(meta.short ?? meta.full)(stats.avg)}</b>
+          </span>
+        </p>
+      )}
 
       {selected && (
         <div className="animate-fade-in mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-control bg-surface-soft px-4 py-3 text-meta">

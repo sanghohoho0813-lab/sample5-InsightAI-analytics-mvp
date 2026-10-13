@@ -9,7 +9,7 @@ import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import FilterToolbar from "@/components/FilterToolbar";
 import EmptyState from "@/components/EmptyState";
-import KpiStrip from "@/components/KpiStrip";
+import MetricTabs from "@/components/MetricTabs";
 import { Panel, PanelHeader } from "@/components/Panel";
 import RevenueTrendChart from "@/components/charts/RevenueTrendChart";
 import ChartTooltip from "@/components/charts/ChartTooltip";
@@ -108,6 +108,7 @@ function AnalyticsView() {
   const isMoney = breakMetric === "revenue" || breakMetric === "adSpend";
   const fmt = (v: number) => (isPct ? `${v.toFixed(2)}%` : isMoney ? formatKRW(v) : formatNumber(v));
   const total = data.breakdown.reduce((a, s) => a + s.value, 0) || 1;
+  const maxValue = Math.max(...data.breakdown.map((b) => b.value), 1);
   const selectedName = dimension === "channel" ? filters.channel : dimension === "product" ? filters.product : "all";
   const canDrill = dimension !== "customerType";
   const estimated = dimension === "customerType" && !["customers", "orders"].includes(breakMetric);
@@ -139,11 +140,12 @@ function AnalyticsView() {
       />
       <FilterToolbar dataset={dataset} />
 
-      {/* 특정 변화를 보러 들어왔으면 그 차트를 먼저 보여준다 */}
-      <div className={`flex flex-col gap-6 ${focused ? "flex-col-reverse" : ""}`}>
-        <KpiStrip kpis={data.kpis} selected={metric} onSelect={setPicked} />
-        <RevenueTrendChart points={data.trend} metric={metric} markDate={focused?.date} />
-      </div>
+      <RevenueTrendChart
+        points={data.trend}
+        metric={metric}
+        markDate={focused?.date}
+        header={<MetricTabs kpis={data.kpis} selected={metric} onSelect={setPicked} />}
+      />
 
       {dims.length > 0 && (
       <Panel className="mt-6" aria-labelledby="breakdown-title">
@@ -190,7 +192,8 @@ function AnalyticsView() {
           <p className="px-5 py-10 text-center text-sub text-ink-dim md:px-6">다른 지표를 선택해주세요.</p>
         ) : (
           <div className="grid gap-2 p-5 md:p-6 lg:grid-cols-[1fr_1fr] lg:gap-8">
-            <div className="h-[240px] min-w-0">
+            {/* 막대 차트는 넓은 화면에서만 — 좁은 화면에서는 아래 표의 막대로 읽는다 */}
+            <div className="hidden h-[240px] min-w-0 lg:block" aria-hidden>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.breakdown} layout="vertical" margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid stroke={COLORS.grid} horizontal={false} />
@@ -247,7 +250,15 @@ function AnalyticsView() {
                       aria-selected={canDrill ? on : undefined}
                       className={`border-b border-line/70 last:border-0 ${canDrill ? "cursor-pointer hover:bg-surface-soft" : ""} ${on ? "bg-brand-soft/60" : ""}`}
                     >
-                      <td className={`py-3 pr-2 ${on ? "font-semibold text-brand" : "text-ink"}`}>{b.name}</td>
+                      <td className={`py-3 pr-2 ${on ? "font-semibold text-brand" : "text-ink"}`}>
+                        {b.name}
+                        <span className="mt-1.5 block h-1.5 rounded-full bg-surface-soft lg:hidden" aria-hidden>
+                          <span
+                            className="block h-full rounded-full bg-brand"
+                            style={{ width: `${(b.value / maxValue) * 100}%`, opacity: selectedName === "all" || on ? 1 : 0.35 }}
+                          />
+                        </span>
+                      </td>
                       <td className="tabular py-3 text-right font-semibold text-ink">{fmt(b.value)}</td>
                       <td className="tabular py-3 pl-2 text-right text-ink-soft">
                         {isPct ? "–" : `${((b.value / total) * 100).toFixed(1)}%`}

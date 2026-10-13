@@ -16,6 +16,8 @@ export interface AiContext {
   products: { name: string; revenue: string; share: string }[];
   anomalies: { date: string; title: string; detail: string }[];
   forecast: { next7Revenue: string; changeVsLast7: string } | null;
+  /** 화면에 표시된 분석 결론(무엇이 변했나·원인·위험) — 답이 화면과 같은 방향이 되도록 */
+  findings?: string[];
   /** 파일에 없어 계산하지 않은 항목 — 모델이 지어내지 않도록 알려준다 */
   unavailable: string[];
 }

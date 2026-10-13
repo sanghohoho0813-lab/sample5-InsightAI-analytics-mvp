@@ -11,6 +11,8 @@ import { useApp } from "@/lib/store";
 import { findDataset } from "@/lib/persist";
 import { getDemoDatasets } from "@/lib/demo-data";
 import { btn } from "@/lib/ui";
+import { capabilities } from "@/lib/capabilities";
+import { Check, X } from "lucide-react";
 
 const DATETIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
 
@@ -29,13 +31,15 @@ export default function DataPage() {
     return new Set(history.filter((h) => findDataset(h.datasetId)).map((h) => h.id));
   }, [history, mounted]);
 
+  const caps = useMemo(() => (dataset ? capabilities(dataset.rows, dataset.derived) : []), [dataset]);
+
   if (!ready) return <PageSkeleton />;
 
   return (
     <>
       <PageHeader
         title="데이터"
-        description="파일을 올리거나 샘플을 골라 분석합니다"
+        description="파일을 올리면 열 인식·분석 가능 항목·품질 문제를 먼저 보여드린 뒤 분석합니다"
       />
 
       {dataset && (
@@ -55,6 +59,18 @@ export default function DataPage() {
               {showPreview ? "미리보기 닫기" : "원본 미리보기"}
             </button>
           </div>
+          <div className="mt-4 border-t border-line pt-4">
+            <p className="text-caption font-semibold text-ink-dim">이 데이터로 하는 분석</p>
+            <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
+              {caps.map((c) => (
+                <li key={c.label} className={`flex items-center gap-1.5 text-meta ${c.ok ? "text-ink" : "text-ink-dim"}`} title={c.note}>
+                  {c.ok ? <Check className="h-4 w-4 text-positive" aria-hidden /> : <X className="h-4 w-4 text-ink-dim" aria-hidden />}
+                  {c.label}
+                  <span className="sr-only">{c.ok ? " 가능" : ` 불가 — ${c.note}`}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
           {showPreview && (
             <div className="mt-5">
               <DataTable rows={dataset.rows} derived={dataset.derived} />
@@ -63,14 +79,14 @@ export default function DataPage() {
         </Panel>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
-        <section aria-labelledby="upload-title" className="min-w-0">
-          <h2 id="upload-title" className="mb-3 text-card font-bold text-ink">
-            내 파일 올리기
-          </h2>
-          <UploadPanel />
-        </section>
+      <section aria-labelledby="upload-title" className="min-w-0">
+        <h2 id="upload-title" className="mb-3 text-card font-bold text-ink">
+          내 파일 올리기
+        </h2>
+        <UploadPanel />
+      </section>
 
+      <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <section aria-labelledby="sample-title" className="min-w-0">
           <h2 id="sample-title" className="mb-3 text-card font-bold text-ink">
             샘플 데이터
@@ -103,9 +119,8 @@ export default function DataPage() {
             </ul>
           </Panel>
         </section>
-      </div>
 
-      <Panel className="mt-6" aria-labelledby="history-title">
+      <Panel className="min-w-0 self-start" aria-labelledby="history-title">
         <PanelHeader
           id="history-title"
           title="분석 기록"
@@ -158,6 +173,7 @@ export default function DataPage() {
           </div>
         )}
       </Panel>
+      </div>
     </>
   );
 }
