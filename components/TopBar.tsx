@@ -10,7 +10,7 @@ function DemoBadge() {
   return (
     <span
       className="shrink-0 whitespace-nowrap rounded-full border border-line-strong px-2 py-0.5 text-caption font-semibold text-ink-soft"
-      title="샘플 데이터와 규칙 기반 분석 엔진으로 동작하는 데모입니다."
+      title="규칙 기반 분석 엔진으로 동작하는 데모입니다. 데이터는 이 브라우저에만 저장됩니다."
     >
       데모
     </span>

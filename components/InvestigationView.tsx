@@ -14,7 +14,10 @@ import { ALL_NAV } from "@/lib/nav";
 import { Anomaly } from "@/lib/types";
 import { SEVERITY_META, btn } from "@/lib/ui";
 
-const pctText = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(0)}%`;
+const pctText = (v: number) => {
+  const abs = Math.abs(v).toFixed(0);
+  return abs === "0" ? "0%" : `${v > 0 ? "+" : "−"}${abs}%`;
+};
 
 function Step({ n, title, children, className = "" }: { n: number; title: string; children: React.ReactNode; className?: string }) {
   const id = `step-${n}`;

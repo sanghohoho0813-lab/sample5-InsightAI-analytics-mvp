@@ -75,7 +75,7 @@ export function diagnose(a: Anomaly): Diagnosis {
       cause: trackingFirst
         ? "주문은 크게 줄지 않았는데 방문자만 줄었습니다. 실제 손님이 줄었다기보다 방문 집계가 빠졌을 가능성이 큽니다."
         : partial
-          ? `방문자(${v.toFixed(0)}%)가 주문(${o.toFixed(0)}%)보다 훨씬 크게 줄었습니다. ${
+          ? `방문자(−${Math.abs(v).toFixed(0)}%)가 주문(−${Math.abs(o).toFixed(0)}%)보다 훨씬 크게 줄었습니다. ${
               store ? "지나가다 들르는 손님이 줄었거나 출입 집계 일부가 빠졌을" : "구매 의향이 낮은 유입(광고·외부 링크)이 끊겼거나 방문 집계 일부가 빠졌을"
             } 가능성이 큽니다.`
           : `방문자와 주문이 함께 줄었습니다. ${
@@ -226,7 +226,7 @@ export function investigate(ds: DemoDataset, a: Anomaly, filters: Filters): Inve
   // 1) 무슨 변화인가
   const where = scope === "전체" ? "" : `${scope}의 `;
   const head = a.metrics[0];
-  const others = a.metrics.slice(1).map((m) => `${m.label} ${m.deltaPct > 0 ? "+" : ""}${m.deltaPct.toFixed(0)}%`);
+  const others = a.metrics.slice(1).map((m) => `${m.label} ${m.deltaPct > 0 ? "+" : "−"}${Math.abs(m.deltaPct).toFixed(0)}%`);
   const what = `${formatMonthDay(peakDate)} ${where}${subject(head.label)} ${josa(fmtMetric(key, head.value), "으로")}, 평소(${fmtMetric(
     key,
     head.expected
@@ -314,7 +314,7 @@ export function investigate(ds: DemoDataset, a: Anomaly, filters: Filters): Inve
         scope === "전체" ? "사업 전체" : scope
       }에 영향을 준 요인일 가능성이 큽니다.`;
     } else if (top) {
-      summary = `${top.name}의 변화가 가장 컸습니다(평소 대비 ${top.deltaPct > 0 ? "+" : ""}${top.deltaPct.toFixed(0)}%).`;
+      summary = `${top.name}의 변화가 가장 컸습니다(평소 대비 ${top.deltaPct > 0 ? "+" : "−"}${Math.abs(top.deltaPct).toFixed(0)}%).`;
     } else summary = "";
     return {
       dim,

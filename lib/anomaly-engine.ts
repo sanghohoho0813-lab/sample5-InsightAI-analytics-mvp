@@ -234,13 +234,13 @@ export function detectAnomalies(
     const startDate = e.hits.find((h) => h.index === e.start)!.date;
     const endDate = e.hits.find((h) => h.index === e.end)!.date;
     const days = e.end - e.start + 1;
-    const where = e.scope !== "전체" ? `${e.scope} ` : "";
+    const where = `${e.scope} `;
     const labels = peaks.map((h) => h.metric.label);
     const verb = e.up ? "급증" : "급감";
     const severity = peaks.map((h) => severityFor(h.delta)).sort((a, b) => SEV.indexOf(a) - SEV.indexOf(b))[0];
     const ongoing = endDate === lastDataDate && endDate === end;
     const span = days > 1 ? `${formatDateKR(startDate).slice(5)}부터 ${days}일간 ` : "";
-    const parts = peaks.map((h) => `${h.metric.label} ${h.delta > 0 ? "+" : ""}${h.delta.toFixed(0)}%`);
+    const parts = peaks.map((h) => `${h.metric.label} ${h.delta > 0 ? "+" : "−"}${Math.abs(h.delta).toFixed(0)}%`);
     const detailMetrics: AnomalyMetric[] = peaks.map((h) => ({
       key: h.metric.key,
       label: h.metric.label,

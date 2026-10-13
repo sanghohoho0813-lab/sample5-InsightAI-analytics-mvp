@@ -186,7 +186,7 @@ export default function UploadPanel() {
               {result.rowCount.toLocaleString("ko-KR")}행 · {p.days}일치 · {result.columns.length}열
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex w-full gap-2 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
             <button onClick={reset} className={btn.secondary}>
               취소
             </button>

@@ -53,7 +53,7 @@ export default function SettingsPage() {
           </Row>
           <Row
             label="분석 엔진"
-            desc="지표 집계·이상치 탐지·인사이트를 정해진 규칙으로 계산합니다. 같은 데이터면 언제나 같은 결과가 나옵니다."
+            desc="기간 비교·원인 분해·이상치 탐지·실행 제안을 정해진 규칙으로 계산합니다. 같은 데이터면 언제나 같은 결과가 나오고, 결론마다 근거 수치를 함께 보여줍니다."
           >
             <span className="rounded-full border border-line-strong px-3 py-1 text-meta font-semibold text-ink-soft">규칙 기반 · 데모</span>
           </Row>

@@ -80,8 +80,8 @@ const Ctx = createContext<AppState | null>(null);
 
 export const ANALYSIS_STEPS = [
   "데이터 구조 확인",
-  "지표 집계 · 이전 기간 비교",
-  "이상치 탐지 · 인사이트 정리",
+  "이전 기간 비교 · 변화 원인 계산",
+  "평소와 다른 날 찾기 · 할 일 정리",
 ];
 
 const DEFAULT_SETTINGS: AppSettings = { defaultPreset: "30" };

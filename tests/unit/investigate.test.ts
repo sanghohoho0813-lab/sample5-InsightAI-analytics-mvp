@@ -31,7 +31,7 @@ describe("diagnose — 함께 움직인 지표 조합으로 원인 유형을 고
   it("방문자만 크게 줄고 주문은 덜 줄었으면 유입 문제(또는 집계 누락)로 본다", () => {
     const d = diagnose(fake({ revenue: -40, visitors: -70, orders: -40 }));
     expect(d.pattern).toBe("traffic");
-    expect(d.cause).toMatch(/방문자\(-70%\)가 주문\(-40%\)보다/);
+    expect(d.cause).toMatch(/방문자\(−70%\)가 주문\(−40%\)보다/);
     expect(d.steps[0]).toMatch(/광고/);
   });
 
