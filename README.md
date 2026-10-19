@@ -60,6 +60,22 @@
 - 페이지 설명줄은 비교 기준을 한 줄로 보여줍니다: `최근 30일 · 이전 30일과 비교`. 대시보드는 대신 데이터 이름과 마지막 데이터 날짜(신선도)를 보여주고, 비교 기준은 브리핑 첫 줄에 둡니다.
 - 모바일 하단 탭 5개: 홈 · 이상 감지 · 인사이트 · 보고서 · 더보기.
 
+## 디자인 방향
+
+InsightAI는 대표·실무자가 매일 여는 **B2B 분석 도구**라서 화면 대부분은 **기능·행동 중심**으로, 첫인상을 만드는 소개 화면만 **하이브리드**(제품 미리보기 중심)로 설계했습니다.
+상용 B2B SaaS·회계/BI 도구의 신뢰감을 기준으로, 기존 브랜드(그래파이트 사이드바 · 브랜드 블루 · 따뜻한 회백색 바탕)는 그대로 두고 표현의 정밀도를 높였습니다.
+
+| 화면 | 방향 | 핵심 |
+|---|---|---|
+| 소개 `/intro` | 하이브리드 | 한 문장 약속 + **실제 샘플 데이터로 계산한 대시보드 축소판**(그림이 아니라 엔진 결과) · 단계별 미리보기(진단 · 채널별 변화 · 조사 타임라인) · 원칙 띠 · 업종별 샘플 카드 |
+| 대시보드 | 기능 | 브랜드 톤 머리의 경영 브리핑(한 문장 · 매출 · 흐름선) → 지표 탭 + 추이 → 평소와 달랐던 날 |
+| 데이터 | 기능 | 지금 데이터 요약(기간 · 행 수 · 채널 · 상품 · 가능한 분석) → 업로드(오른쪽에 '열에 따라 볼 수 있는 분석' 안내) → 샘플 카드(90일 흐름선 + 이번 기간 결론) |
+| 보고서 | 문서 | 가운데 정렬된 종이 문서 — 제목 · 범위 · 저장 시각 · 비교 기준 · 데이터 · 분석 방식 머리, 번호가 붙은 6개 절 |
+| 모바일 | 앱 | 하단 탭(활성 탭 알약 표시) · 질의 추천은 한 줄 목록 · 업로드 진단 중에는 하단에 '분석 시작' 고정 |
+
+- 글꼴: **Pretendard**(OFL)를 자체 호스팅합니다(`public/fonts/pretendard`, 쓰인 글자 범위만 나눠 받는 dynamic subset). 시스템 글꼴에 기대지 않아 어느 PC에서나 같은 품질로 보입니다. 제목은 크기에 비례해 자간을 좁힙니다.
+- 사용자 표시(사이드바 하단 · 더보기)는 기존 사용자 정보(`BRAND.user`)를 보여줄 뿐 새 기능이 아닙니다.
+
 ## 디자인 시스템
 
 모든 값은 `app/globals.css`의 `@theme` 토큰입니다.
@@ -67,9 +83,9 @@
 | 구분 | 토큰 |
 |---|---|
 | 색상 | 브랜드 블루 `brand #0a62db`(글자·버튼) / 로고 블루 `#1478ff`(차트 선) · 보조 틸 `accent #0f9fb3`(예측·비교 시리즈 전용) · 뉴트럴(canvas/surface/line/ink/nav) · 상태 `positive / warning / negative` — **모든 글자 색은 WCAG AA(4.5:1) 이상**, E2E에서 axe로 검사 |
-| 타입 스케일(360px 기준) | `caption 13` · `meta 14` · `sub 15` · `body 16` · `lead 17` · `card 18` · `title 22` · `page 28` · `kpi 28` · `display 40` — 768px 이상에서 `title 24 · page 32 · kpi 30 · display 52` |
+| 타입 스케일(360px 기준) | `caption 13` · `meta 14` · `sub 15` · `body 16` · `lead 17` · `card 18` · `title 22` · `page 26` · `kpi 28` · `display 40` — 768px 이상에서 `title 24 · page 30 · kpi 30 · display 52` · 본문 자간 −0.011em, 제목 −0.022em |
 | 모서리 | `rounded-control 10` · `rounded-card 14` · `rounded-panel 20` |
-| 그림자 | `shadow-subtle` · `shadow-raised` · `shadow-overlay` |
+| 그림자 | `shadow-subtle` · `shadow-raised` · `shadow-overlay` · `shadow-button`(주요 버튼의 얕은 브랜드 그림자) |
 | 간격 | 4/8px 리듬(gap 2·3·4·6·8) |
 | 한국어 | `word-break: keep-all; overflow-wrap: break-word` 전역 적용 |
 
@@ -78,7 +94,8 @@
 - 패널 안에 패널을 넣지 않습니다(카드 깊이 1). 목록은 구분선으로 나눕니다.
 - 버튼 위계는 `lib/ui.ts`의 `btn.primary / secondary / quiet / danger` 네 가지. **primary는 화면당 하나.**
 - 차트 색은 `lib/palette.ts` — 단일 지표는 브랜드 블루, 이전 기간은 옅은 블루 점선, 예측은 틸, 범주형은 블루 명도 단계 + 뉴트럴.
-- 장식용 그라데이션·글로우·카운트업·"AI" 반짝이 아이콘을 쓰지 않습니다.
+- 장식용 글로우·카운트업·"AI" 반짝이 아이콘을 쓰지 않습니다. 그라데이션은 브리핑·보고서 머리의 아주 옅은 브랜드 톤 한 가지만 씁니다.
+- 작은 흐름선(`components/charts/Sparkline.tsx`)은 숫자 옆에서 '흐름'만 요약하며, 의미는 옆의 숫자·문장이 전달합니다(스크린리더에서는 숨김).
 
 ## 정직한 데모 표기 · 계산 규칙
 
@@ -217,7 +234,8 @@ store (React Context)  ←→  persist (localStorage: 검증된 읽기 · 용량
 ```
 app/(app)/      dashboard, anomalies, insights, analytics, forecast, reports, data, ai, settings, more
 app/intro/      서비스 소개
-components/     BriefingPanel, MetricTabs, ContributionBars, AnomalyList, InvestigationView, InsightList, UploadPanel,
+components/     BriefingPanel, MetricTabs, ContributionBars, AnomalyList, InvestigationView, InsightList, UploadPanel, SampleCard,
+                landing/ (소개 화면의 제품 미리보기),
                 PageHeader, Panel, FilterToolbar, ScopeSheet, DatasetSwitcher, Select, Sidebar, TopBar, MobileNav,
                 DateLine, DateRangePicker, DataTable, AnalysisOverlay, ToastStack, EmptyState, PageSkeleton,
                 AppFooter, SampleBridgeCTA, MiraeLogo, Logo, charts/ (RevenueTrend, Investigation, Forecast)
@@ -227,6 +245,6 @@ lib/            analytics-engine, drivers, anomaly-engine, investigate, insight-
                 ai/ (contract · context · client)
 app/api/ai/     LLM 프록시 라우트
 tests/          unit/ (Vitest) · e2e/ (Playwright + axe)
-public/         brand/ 로고 · sample/insightai-sample.csv 업로드 예시
+public/         brand/ 로고 · sample/insightai-sample.csv 업로드 예시 · fonts/pretendard (OFL, LICENSE.txt 포함)
 supabase/       schema.sql
 ```

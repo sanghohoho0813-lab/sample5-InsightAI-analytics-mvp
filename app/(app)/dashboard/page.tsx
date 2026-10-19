@@ -77,14 +77,18 @@ export default function DashboardPage() {
       <PageHeader
         eyebrow={<DateLine className="text-meta text-ink-dim lg:hidden" showTime={false} />}
         title="대시보드"
-        description={`${dataset.name} · 마지막 데이터 ${formatMonthDay(data.lastDate)}`}
+        description={
+          <>
+            <span className="hidden sm:inline">{dataset.name} · </span>마지막 데이터 {formatMonthDay(data.lastDate)}
+          </>
+        }
         actions={<div className="hidden md:flex">{saveAction}</div>}
       />
 
       <FilterToolbar dataset={dataset} />
 
       {/* 1. 경영 브리핑 — 무엇이 변했나 → 왜 → 위험 → 다음 행동 */}
-      <BriefingPanel b={brief} period={period} derived={dataset.derived} />
+      <BriefingPanel b={brief} period={period} derived={dataset.derived} trend={data.trend.map((p) => p.revenue)} />
 
       {/* 모바일에서는 요약을 읽은 다음에 저장 버튼이 오도록 */}
       <div className="mt-4 md:hidden [&>*]:w-full">{saveAction}</div>

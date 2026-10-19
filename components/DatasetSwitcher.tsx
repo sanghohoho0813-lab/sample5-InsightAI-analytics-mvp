@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Check, ChevronDown, Upload } from "lucide-react";
+import { useMemo } from "react";
+import { Check, ChevronDown, Database, Upload } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { getDemoDatasets } from "@/lib/demo-data";
 import { usePopover } from "@/lib/use-popover";
@@ -12,6 +13,7 @@ export default function DatasetSwitcher({ className = "" }: { className?: string
   const { ready, dataset, uploads, switchDataset } = useApp();
   const { open, setOpen, ref } = usePopover<HTMLDivElement>();
   const demos = getDemoDatasets();
+  const days = useMemo(() => (dataset ? new Set(dataset.rows.map((r) => r.date)).size : 0), [dataset]);
 
   const pick = (ds: DemoDataset) => {
     setOpen(false);
@@ -54,9 +56,19 @@ export default function DatasetSwitcher({ className = "" }: { className?: string
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`분석 데이터 바꾸기 — 지금 ${dataset?.name ?? "없음"}`}
-        className="flex h-10 max-w-full items-center gap-2 rounded-control px-2 text-left transition-colors hover:bg-surface"
+        className={`flex h-10 max-w-full items-center gap-2.5 rounded-control border pl-1.5 pr-2.5 text-left transition-colors ${
+          open ? "border-line bg-surface shadow-subtle" : "border-transparent hover:border-line hover:bg-surface"
+        }`}
       >
+        <span className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-brand-soft text-brand sm:flex" aria-hidden>
+          <Database className="h-4 w-4" strokeWidth={2} />
+        </span>
         <span className="truncate text-sub font-semibold text-ink">{dataset?.name ?? "데이터 선택"}</span>
+        {dataset && (
+          <span className="hidden shrink-0 text-meta text-ink-dim xl:inline">
+            {dataset.id.startsWith("demo-") ? "샘플" : "업로드"} · {days}일치
+          </span>
+        )}
         <ChevronDown className={`h-4 w-4 shrink-0 text-ink-dim transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
       </button>
 

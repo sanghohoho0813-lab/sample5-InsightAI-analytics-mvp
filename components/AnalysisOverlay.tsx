@@ -10,12 +10,19 @@ export default function AnalysisOverlay() {
 
   return (
     <div
-      className="animate-fade-in fixed inset-0 z-[100] flex items-center justify-center bg-ink/30 px-4"
+      className="animate-fade-in fixed inset-0 z-[100] flex items-center justify-center bg-ink/35 px-4 backdrop-blur-[2px]"
       role="alertdialog"
       aria-live="assertive"
       aria-label="데이터 분석 진행 중"
     >
-      <div className="card w-full max-w-[400px] p-6 shadow-overlay">
+      <div className="card w-full max-w-[420px] overflow-hidden shadow-overlay">
+        <div className="h-1 bg-brand-soft" aria-hidden>
+          <div
+            className="h-full bg-brand transition-[width] duration-500 ease-out"
+            style={{ width: `${((analysisStep + 1) / ANALYSIS_STEPS.length) * 100}%` }}
+          />
+        </div>
+        <div className="p-6">
         <p className="text-card font-bold text-ink">데이터를 분석하고 있습니다</p>
         <p className="mt-1 text-meta text-ink-dim">규칙 기반 분석 엔진 · 몇 초면 끝납니다</p>
         <ol className="mt-5 space-y-3">
@@ -39,6 +46,7 @@ export default function AnalysisOverlay() {
             );
           })}
         </ol>
+        </div>
       </div>
     </div>
   );

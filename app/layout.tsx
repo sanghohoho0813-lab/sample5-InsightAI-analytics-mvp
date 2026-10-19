@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+// Pretendard(OFL) — 자체 호스팅, 화면에 쓰인 글자 범위만 나눠 받는다(public/fonts/pretendard)
+import "./pretendard.css";
 import "./globals.css";
 import { AppProvider } from "@/lib/store";
 import ToastStack from "@/components/ToastStack";

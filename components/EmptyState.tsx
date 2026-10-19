@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Database } from "lucide-react";
 import { getDemoDatasets } from "@/lib/demo-data";
 import { useApp } from "@/lib/store";
 import { btn } from "@/lib/ui";
@@ -18,7 +19,10 @@ export default function EmptyState({
 
   return (
     <div className="card flex flex-col items-center px-6 py-16 text-center">
-      <h2 className="text-title font-bold text-ink">{title}</h2>
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft text-brand" aria-hidden>
+        <Database className="h-6 w-6" />
+      </span>
+      <h2 className="mt-5 text-title font-bold text-ink">{title}</h2>
       <p className="mt-2 max-w-md text-body text-ink-soft">{description}</p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">
         <button onClick={() => startAnalysis(getDemoDatasets()[0])} className={btn.primary}>

@@ -6,14 +6,14 @@ const base =
   "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-control px-4 text-sub font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
 export const btn = {
-  primary: `${base} bg-brand text-white hover:bg-brand-dark`,
-  secondary: `${base} border border-line-strong bg-surface text-ink hover:border-ink-dim`,
+  primary: `${base} bg-brand text-white shadow-button hover:bg-brand-dark active:translate-y-px`,
+  secondary: `${base} border border-line-strong bg-surface text-ink shadow-subtle hover:border-ink-dim/50 hover:bg-surface-soft active:translate-y-px`,
   quiet: "inline-flex min-h-11 items-center gap-1 whitespace-nowrap text-sub font-semibold text-brand transition-colors hover:text-brand-dark",
   danger: `${base} border border-negative/40 bg-surface text-negative hover:bg-negative-soft`,
 };
 
 export const field =
-  "h-11 min-w-0 rounded-control border border-line bg-surface px-3 text-sub font-medium text-ink outline-none transition-colors hover:border-line-strong focus:border-brand";
+  "h-11 min-w-0 rounded-control border border-line-strong/80 bg-surface px-3 text-sub font-medium text-ink shadow-subtle outline-none transition-[border-color,box-shadow] placeholder:text-ink-dim hover:border-ink-dim/50 focus:border-brand focus:shadow-[0_0_0_3px_rgba(10,98,219,0.14)]";
 
 /** 상태 표식 — 색만으로 구분하지 않도록 항상 텍스트 라벨과 함께 쓴다. */
 export const SEVERITY_META = {

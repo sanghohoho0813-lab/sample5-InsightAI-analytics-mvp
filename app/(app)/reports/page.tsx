@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText, Pencil, Trash2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import EmptyState from "@/components/EmptyState";
@@ -27,8 +27,8 @@ function ReportDetail({ report }: { report: SavedReport }) {
   const [draft, setDraft] = useState(report.title);
   const source = findDataset(report.datasetId);
 
-  const section = "border-t border-line px-5 py-6 md:px-8";
-  const h = "text-card font-bold text-ink";
+  const section = "border-t border-line px-5 py-7 md:px-12 md:py-9";
+  const h = "text-card font-bold text-ink md:text-[20px]";
   // 위험 요소는 '위험' 섹션에, 나머지 발견은 '주요 발견'에 — 같은 내용을 두 번 쓰지 않는다.
   const risks = report.findings.filter((f) => f.impact === "negative");
   const findings = report.findings.filter((f) => f.impact !== "negative");
@@ -53,68 +53,12 @@ function ReportDetail({ report }: { report: SavedReport }) {
   };
 
   return (
-    <>
-      <Link href="/reports" className="no-print mb-4 inline-flex min-h-11 items-center gap-1 text-sub font-semibold text-ink-soft hover:text-ink">
-        <ArrowLeft className="h-4 w-4" aria-hidden /> 보고서 목록
-      </Link>
-
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="min-w-0 flex-1">
-          {editing ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                saveTitle();
-              }}
-              className="flex flex-col gap-2 sm:flex-row"
-            >
-              <label htmlFor="rename" className="sr-only">
-                보고서 제목
-              </label>
-              <input
-                id="rename"
-                autoFocus
-                value={draft}
-                maxLength={60}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => e.key === "Escape" && (setDraft(report.title), setEditing(false))}
-                className={`${field} h-12 w-full text-lead font-semibold sm:flex-1`}
-              />
-              <div className="flex gap-2">
-                <button type="submit" disabled={!draft.trim()} className={btn.primary}>
-                  저장
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDraft(report.title);
-                    setEditing(false);
-                  }}
-                  className={btn.secondary}
-                >
-                  취소
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="flex items-start gap-1">
-              <h1 className="min-w-0 text-page font-bold tracking-tight text-ink">{report.title}</h1>
-              <button
-                onClick={() => setEditing(true)}
-                className="no-print mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-ink-dim hover:bg-surface hover:text-ink"
-                aria-label="제목 수정"
-                title="제목 수정"
-              >
-                <Pencil className="h-4 w-4" aria-hidden />
-              </button>
-            </div>
-          )}
-          <p className="mt-2 text-body text-ink-soft">
-            {report.title.includes(report.datasetName) ? "" : `${report.datasetName} · `}
-            {scopeLabel(report.scope)}
-          </p>
-        </div>
-        <div className="no-print flex shrink-0 flex-wrap gap-2">
+    <div className="mx-auto max-w-[920px]">
+      <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
+        <Link href="/reports" className="inline-flex min-h-11 items-center gap-1 text-sub font-semibold text-ink-soft hover:text-ink">
+          <ArrowLeft className="h-4 w-4" aria-hidden /> 보고서 목록
+        </Link>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
           {source && (
             <button onClick={openScope} className={btn.secondary}>
               이 범위로 대시보드 열기
@@ -132,18 +76,92 @@ function ReportDetail({ report }: { report: SavedReport }) {
         </div>
       </div>
 
-      <Panel as="article" className="overflow-hidden" aria-label="보고서 본문">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-soft px-5 py-3 text-meta text-ink-dim md:px-8">
-          <span>분석 기록 · {DATETIME.format(new Date(report.createdAt))} 저장</span>
-          <span>{report.data?.source === "upload" ? "업로드 데이터" : "샘플 데이터"} · 규칙 기반 분석</span>
-        </div>
+      <Panel as="article" className="overflow-hidden shadow-raised" aria-label="보고서 본문">
+        {/* 문서 머리 — 제목 · 범위 · 언제 어떤 데이터로 만든 기록인지 */}
+        <header className="relative border-b border-line px-5 pb-7 pt-8 md:px-12 md:pb-9 md:pt-11">
+          <span className="absolute inset-x-0 top-0 h-[3px] bg-brand" aria-hidden />
+          <p className="eyebrow">분석 보고서 · {BRAND.product}</p>
+          <div className="mt-2">
+            {editing ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  saveTitle();
+                }}
+                className="flex flex-col gap-2 sm:flex-row"
+              >
+                <label htmlFor="rename" className="sr-only">
+                  보고서 제목
+                </label>
+                <input
+                  id="rename"
+                  autoFocus
+                  value={draft}
+                  maxLength={60}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && (setDraft(report.title), setEditing(false))}
+                  className={`${field} h-12 w-full text-lead font-semibold sm:flex-1`}
+                />
+                <div className="flex gap-2">
+                  <button type="submit" disabled={!draft.trim()} className={btn.primary}>
+                    저장
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraft(report.title);
+                      setEditing(false);
+                    }}
+                    className={btn.secondary}
+                  >
+                    취소
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex items-start gap-1">
+                <h1 className="min-w-0 text-page font-bold text-ink">{report.title}</h1>
+                <button
+                  onClick={() => setEditing(true)}
+                  className="no-print mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-ink-dim hover:bg-surface-soft hover:text-ink"
+                  aria-label="제목 수정"
+                  title="제목 수정"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden />
+                </button>
+              </div>
+            )}
+          </div>
+          <p className="mt-2 text-body text-ink-soft">
+            {report.title.includes(report.datasetName) ? "" : `${report.datasetName} · `}
+            {scopeLabel(report.scope)}
+          </p>
+          <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-3 text-meta sm:grid-cols-4">
+            <div>
+              <dt className="text-caption text-ink-dim">저장</dt>
+              <dd className="tabular mt-0.5 font-semibold text-ink">{DATETIME.format(new Date(report.createdAt))}</dd>
+            </div>
+            <div>
+              <dt className="text-caption text-ink-dim">비교 기준</dt>
+              <dd className="mt-0.5 font-semibold text-ink">{report.comparison?.split(" · ")[1] ?? "이전 같은 기간"}</dd>
+            </div>
+            <div>
+              <dt className="text-caption text-ink-dim">데이터</dt>
+              <dd className="mt-0.5 font-semibold text-ink">{report.data?.source === "upload" ? "업로드 데이터" : "샘플 데이터"}</dd>
+            </div>
+            <div>
+              <dt className="text-caption text-ink-dim">분석 방식</dt>
+              <dd className="mt-0.5 font-semibold text-ink">규칙 기반 계산</dd>
+            </div>
+          </dl>
+        </header>
 
         {/* 1. 핵심 요약 */}
-        <section className="px-5 py-6 md:px-8" aria-labelledby="r-summary">
+        <section className="px-5 py-7 md:px-12 md:py-9" aria-labelledby="r-summary">
           <h2 id="r-summary" className={h}>
-            1. 핵심 요약
+            <span className="tabular text-brand">1.</span> 핵심 요약
           </h2>
-          <p className="mt-3 text-title font-bold tracking-tight text-ink">{report.headline}</p>
+          <p className="mt-4 text-title font-bold leading-snug text-ink md:text-[26px]">{report.headline}</p>
           {report.brief && (
             <dl className="mt-5 grid gap-5 md:grid-cols-3">
               {(
@@ -166,7 +184,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
         {/* 2. 분석 범위 */}
         <section className={section} aria-labelledby="r-scope">
           <h2 id="r-scope" className={h}>
-            2. 분석 범위
+            <span className="tabular text-brand">2.</span> 분석 범위
           </h2>
           <dl className="mt-3 grid gap-x-8 gap-y-3 text-sub sm:grid-cols-2">
             <div className="flex gap-3">
@@ -209,7 +227,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
         {/* 3. 주요 발견 */}
         <section className={section} aria-labelledby="r-findings">
           <h2 id="r-findings" className={h}>
-            3. 주요 발견
+            <span className="tabular text-brand">3.</span> 주요 발견
           </h2>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sub">
@@ -283,7 +301,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
         {/* 4. 위험 요소 */}
         <section className={section} aria-labelledby="r-risks">
           <h2 id="r-risks" className={h}>
-            4. 위험 요소
+            <span className="tabular text-brand">4.</span> 위험 요소
           </h2>
           {risks.length === 0 && report.anomalies.length === 0 ? (
             <p className="mt-3 text-sub text-ink-soft">저장 시점에 확인이 필요한 위험 신호는 없었습니다.</p>
@@ -314,7 +332,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
         {/* 5. 권장 행동 */}
         <section className={section} aria-labelledby="r-actions">
           <h2 id="r-actions" className={h}>
-            5. 권장 행동
+            <span className="tabular text-brand">5.</span> 권장 행동
           </h2>
           {report.recommendations.length === 0 ? (
             <p className="mt-3 text-sub text-ink-soft">근거를 들어 제안할 행동이 없었습니다.</p>
@@ -341,7 +359,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
         {/* 6. 생성 시점 */}
         <section className={`${section} bg-surface-soft`} aria-labelledby="r-meta">
           <h2 id="r-meta" className={h}>
-            6. 생성 시점
+            <span className="tabular text-brand">6.</span> 생성 시점
           </h2>
           <p className="mt-2 text-sub text-ink">
             {DATETIME.format(new Date(report.createdAt))} · 작성 {BRAND.user.display}
@@ -364,7 +382,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
           <Trash2 className="h-4 w-4" aria-hidden /> 이 보고서 삭제
         </button>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -465,24 +483,32 @@ function ReportLibrary() {
           <ul className="mt-2 divide-y divide-line">
             {reports.map((r) => (
               <li key={r.id}>
-                <Link href={`/reports?id=${r.id}`} className="block px-5 py-4 transition-colors hover:bg-surface-soft md:px-6">
-                  <span className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <span className="text-body font-semibold text-ink">{r.title}</span>
-                    <span className="tabular text-meta text-ink-dim">{DATETIME.format(new Date(r.createdAt))}</span>
+                <Link href={`/reports?id=${r.id}`} className="group flex gap-4 px-5 py-5 transition-colors hover:bg-surface-soft md:px-6">
+                  <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-soft text-brand" aria-hidden>
+                    <FileText className="h-5 w-5" />
                   </span>
-                  <span className="mt-1 block text-meta text-ink-dim">
-                    {r.datasetName} · {scopeLabel(r.scope)}
-                  </span>
-                  <span className="mt-2 block text-sub text-ink">
-                    {r.headline}
-                    {r.brief?.change && <span className="text-ink-soft"> {r.brief.change.title}.</span>}
-                  </span>
-                  {(r.brief?.risk || r.anomalies.length > 0) && (
-                    <span className="mt-1 block text-meta text-ink-dim">
-                      위험 요소 {r.findings.filter((f) => f.impact === "negative").length + r.anomalies.length}건
-                      {r.brief?.risk ? ` · ${r.brief.risk.title}` : ""}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <span className="text-body font-semibold text-ink group-hover:text-brand">{r.title}</span>
+                      <span className="tabular text-meta text-ink-dim">{DATETIME.format(new Date(r.createdAt))}</span>
                     </span>
-                  )}
+                    <span className="mt-0.5 block text-meta text-ink-dim">
+                      {r.datasetName} · {scopeLabel(r.scope)}
+                    </span>
+                    <span className="mt-2 block text-sub text-ink">
+                      {r.headline}
+                      {r.brief?.change && <span className="text-ink-soft"> {r.brief.change.title}.</span>}
+                    </span>
+                    {(r.brief?.risk || r.anomalies.length > 0) && (
+                      <span className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-negative-soft px-2.5 py-0.5 text-caption font-semibold text-negative">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-negative" aria-hidden />
+                        <span className="truncate">
+                          위험 요소 {r.findings.filter((f) => f.impact === "negative").length + r.anomalies.length}건
+                          {r.brief?.risk ? ` · ${r.brief.risk.title}` : ""}
+                        </span>
+                      </span>
+                    )}
+                  </span>
                 </Link>
               </li>
             ))}

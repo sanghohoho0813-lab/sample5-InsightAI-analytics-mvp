@@ -12,7 +12,8 @@ import { findDataset } from "@/lib/persist";
 import { getDemoDatasets } from "@/lib/demo-data";
 import { btn } from "@/lib/ui";
 import { capabilities } from "@/lib/capabilities";
-import { Check, X } from "lucide-react";
+import { Check, Database, X } from "lucide-react";
+import SampleCard, { samplePreview } from "@/components/SampleCard";
 
 const DATETIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
 
@@ -32,6 +33,11 @@ export default function DataPage() {
   }, [history, mounted]);
 
   const caps = useMemo(() => (dataset ? capabilities(dataset.rows, dataset.derived) : []), [dataset]);
+  const dataDays = useMemo(() => (dataset ? new Set(dataset.rows.map((r) => r.date)).size : 0), [dataset]);
+  const previews = useMemo(
+    () => (mounted ? Object.fromEntries(demos.map((d) => [d.id, samplePreview(d)])) : null),
+    [mounted, demos]
+  );
 
   if (!ready) return <PageSkeleton />;
 
@@ -39,32 +45,71 @@ export default function DataPage() {
     <>
       <PageHeader
         title="데이터"
-        description="파일을 올리면 열 인식·분석 가능 항목·품질 문제를 먼저 보여드린 뒤 분석합니다"
+        description="분석할 데이터를 고르고, 올리고, 지난 분석을 다시 엽니다"
       />
 
       {dataset && (
-        <Panel className="mb-6 p-5 md:p-6" aria-labelledby="current-data">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-caption font-semibold text-ink-dim">지금 분석 중인 데이터</p>
-              <h2 id="current-data" className="mt-1 text-card font-bold text-ink">
+        <Panel className="mb-8 overflow-hidden" aria-labelledby="current-data">
+          <div className="flex flex-wrap items-start gap-4 p-5 md:p-6">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-brand-soft text-brand" aria-hidden>
+              <Database className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="eyebrow">지금 분석 중인 데이터</p>
+              <h2 id="current-data" className="mt-0.5 flex flex-wrap items-center gap-2 text-title font-bold text-ink">
                 {dataset.name}
+                <span className="rounded-full border border-line-strong px-2 py-0.5 text-caption font-semibold text-ink-soft">
+                  {dataset.id.startsWith("demo-") ? "샘플" : "업로드"}
+                </span>
               </h2>
-              <p className="mt-1 text-meta text-ink-soft" suppressHydrationWarning>
-                {dataset.id.startsWith("demo-") ? "샘플 데이터" : "업로드한 파일"} · {mounted ? dataset.periodLabel : ""} ·{" "}
-                {dataset.rows.length.toLocaleString("ko-KR")}행 · 채널 {dataset.channels.length}개 · 상품 {dataset.products.length}개
-              </p>
             </div>
-            <button onClick={() => setShowPreview((v) => !v)} aria-expanded={showPreview} className={btn.secondary}>
-              {showPreview ? "미리보기 닫기" : "원본 미리보기"}
-            </button>
+            <div className="flex w-full gap-2 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
+              <button onClick={() => setShowPreview((v) => !v)} aria-expanded={showPreview} className={btn.secondary}>
+                {showPreview ? "미리보기 닫기" : "원본 미리보기"}
+              </button>
+              <Link href="/dashboard" className={btn.secondary}>
+                대시보드 보기
+              </Link>
+            </div>
           </div>
-          <div className="mt-4 border-t border-line pt-4">
-            <p className="text-caption font-semibold text-ink-dim">이 데이터로 하는 분석</p>
-            <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
+          <dl className="grid grid-cols-2 gap-px border-t border-line bg-line md:grid-cols-4 [&>div]:bg-surface [&>div]:px-5 [&>div]:py-4 md:[&>div]:px-6">
+            <div>
+              <dt className="text-caption text-ink-dim">기간</dt>
+              <dd className="tabular mt-0.5 text-sub font-semibold text-ink" suppressHydrationWarning>
+                {mounted ? dataset.periodLabel : "\u00a0"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-caption text-ink-dim">데이터</dt>
+              <dd className="tabular mt-0.5 text-sub font-semibold text-ink">
+                {dataset.rows.length.toLocaleString("ko-KR")}행 · {dataDays}일치
+              </dd>
+            </div>
+            <div>
+              <dt className="text-caption text-ink-dim">채널</dt>
+              <dd className="mt-0.5 truncate text-sub font-semibold text-ink" title={dataset.channels.join(", ")}>
+                {dataset.channels.length}개 <span className="font-normal text-ink-soft">· {dataset.channels.slice(0, 2).join(", ")}{dataset.channels.length > 2 ? " 외" : ""}</span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-caption text-ink-dim">상품</dt>
+              <dd className="mt-0.5 truncate text-sub font-semibold text-ink" title={dataset.products.join(", ")}>
+                {dataset.products.length}개 <span className="font-normal text-ink-soft">· {dataset.products.slice(0, 2).join(", ")}{dataset.products.length > 2 ? " 외" : ""}</span>
+              </dd>
+            </div>
+          </dl>
+          <div className="border-t border-line bg-surface-soft px-5 py-4 md:px-6">
+            <p className="eyebrow">이 데이터로 하는 분석</p>
+            <ul className="mt-2.5 flex flex-wrap gap-1.5">
               {caps.map((c) => (
-                <li key={c.label} className={`flex items-center gap-1.5 text-meta ${c.ok ? "text-ink" : "text-ink-dim"}`} title={c.note}>
-                  {c.ok ? <Check className="h-4 w-4 text-positive" aria-hidden /> : <X className="h-4 w-4 text-ink-dim" aria-hidden />}
+                <li
+                  key={c.label}
+                  className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-meta ${
+                    c.ok ? "border-line bg-surface text-ink" : "border-dashed border-line-strong text-ink-dim"
+                  }`}
+                  title={c.note}
+                >
+                  {c.ok ? <Check className="h-3.5 w-3.5 text-positive" aria-hidden /> : <X className="h-3.5 w-3.5" aria-hidden />}
                   {c.label}
                   <span className="sr-only">{c.ok ? " 가능" : ` 불가 — ${c.note}`}</span>
                 </li>
@@ -72,7 +117,7 @@ export default function DataPage() {
             </ul>
           </div>
           {showPreview && (
-            <div className="mt-5">
+            <div className="border-t border-line p-5 md:p-6">
               <DataTable rows={dataset.rows} derived={dataset.derived} />
             </div>
           )}
@@ -80,46 +125,36 @@ export default function DataPage() {
       )}
 
       <section aria-labelledby="upload-title" className="min-w-0">
-        <h2 id="upload-title" className="mb-3 text-card font-bold text-ink">
-          내 파일 올리기
-        </h2>
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="upload-title" className="text-title font-bold text-ink">
+            내 파일 올리기
+          </h2>
+          <p className="text-meta text-ink-dim">올리면 바로 분석하지 않고 진단부터 보여드립니다</p>
+        </div>
         <UploadPanel />
       </section>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <section aria-labelledby="sample-title" className="min-w-0">
-          <h2 id="sample-title" className="mb-3 text-card font-bold text-ink">
+      <section aria-labelledby="sample-title" className="mt-10 min-w-0">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="sample-title" className="text-title font-bold text-ink">
             샘플 데이터
           </h2>
-          <Panel as="div">
-            <ul className="divide-y divide-line">
-              {demos.map((ds) => {
-                const active = dataset?.id === ds.id;
-                return (
-                  <li key={ds.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-body font-semibold text-ink">
-                        {ds.name}
-                        {active && <span className="ml-2 text-caption font-semibold text-brand">보는 중</span>}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-meta text-ink-soft">{ds.description}</p>
-                    </div>
-                    {active ? (
-                      <Link href="/dashboard" className={btn.secondary}>
-                        대시보드
-                      </Link>
-                    ) : (
-                      <button onClick={() => startAnalysis(ds)} className={btn.secondary}>
-                        분석하기
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </Panel>
-        </section>
+          <p className="text-meta text-ink-dim">업종별 90일 데이터 · 누르면 바로 분석합니다</p>
+        </div>
+        <ul className="grid gap-5 md:grid-cols-3">
+          {demos.map((ds) => (
+            <SampleCard
+              key={ds.id}
+              ds={ds}
+              preview={previews?.[ds.id] ?? null}
+              active={dataset?.id === ds.id}
+              onAnalyze={() => startAnalysis(ds)}
+            />
+          ))}
+        </ul>
+      </section>
 
+      <div className="mt-10">
       <Panel className="min-w-0 self-start" aria-labelledby="history-title">
         <PanelHeader
           id="history-title"

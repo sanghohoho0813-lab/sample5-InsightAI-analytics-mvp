@@ -6,6 +6,7 @@ import { useDrill } from "@/lib/drill";
 import { signedKRW } from "@/lib/drivers";
 import { formatKRW } from "@/lib/format";
 import { DerivedField, Recommendation } from "@/lib/types";
+import Sparkline from "./charts/Sparkline";
 
 const TONE = {
   positive: { dot: "bg-positive", sr: "좋은 변화" },
@@ -58,9 +59,9 @@ function Cell({
   const { follow } = useDrill();
   const id = `brief-${n}`;
   return (
-    <section className="flex flex-col p-5 md:p-6" aria-labelledby={id}>
+    <section className="flex flex-col p-5 md:px-7 md:py-6" aria-labelledby={id}>
       <h3 id={id} className="flex items-center gap-2 text-caption font-semibold text-ink-dim">
-        <span className="tabular flex h-5 w-5 items-center justify-center rounded-full bg-surface-soft text-[12px] font-bold text-ink-soft ring-1 ring-line-strong">
+        <span className="tabular flex h-5 w-5 items-center justify-center rounded-full bg-brand-soft text-[12px] font-bold text-brand">
           {n}
         </span>
         {label}
@@ -124,29 +125,48 @@ export function ActionItem({ a, n, compact = false }: { a: Recommendation; n: nu
  * 경영 브리핑 — 대시보드 맨 위. 숫자 카드 대신 문장으로 답한다.
  * 이번 기간에 무슨 일이 있었나 → 가장 큰 변화 → 가능성 높은 원인 → 지금 확인할 위험 → 다음 행동
  */
-export default function BriefingPanel({ b, period, derived = [] }: { b: Briefing; period: string; derived?: DerivedField[] }) {
+export default function BriefingPanel({
+  b,
+  period,
+  derived = [],
+  trend = [],
+}: {
+  b: Briefing;
+  period: string;
+  derived?: DerivedField[];
+  /** 이번 기간 일별 매출 — 매출 옆의 작은 추이선 */
+  trend?: number[];
+}) {
   const up = (b.revenueDelta ?? 0) >= 0;
   const NAMES: Partial<Record<DerivedField, string>> = { orders: "주문 수", channel: "채널", product: "상품", adSpend: "광고비" };
   const missingCols = derived.map((f) => NAMES[f]).filter(Boolean).join("·");
   return (
-    <section className="card overflow-hidden" aria-labelledby="brief-title">
-      <div className="flex flex-col gap-4 p-5 md:flex-row md:items-end md:justify-between md:gap-8 md:p-6">
+    <section className="card overflow-hidden shadow-raised" aria-labelledby="brief-title">
+      {/* 머리 — 옅은 브랜드 톤 위에 한 문장 결론, 오른쪽에 매출과 흐름 */}
+      <div className="relative flex flex-col gap-5 bg-[linear-gradient(180deg,#f2f7ff_0%,#ffffff_100%)] p-5 md:flex-row md:items-end md:justify-between md:gap-10 md:px-7 md:py-6">
+        <span className="absolute inset-x-0 top-0 h-[3px] bg-brand" aria-hidden />
         <div className="min-w-0">
-          <p className="text-meta font-semibold text-ink-dim">이번 기간 요약 · {period}</p>
-          <h2 id="brief-title" className="mt-1.5 text-title font-bold tracking-tight text-ink">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta font-semibold text-ink-soft">
+            <span className="rounded-full bg-brand px-2 py-0.5 text-caption font-semibold text-white">이번 기간 요약</span>
+            <span className="text-ink-dim">{period}</span>
+          </p>
+          <h2 id="brief-title" className="mt-2.5 text-title font-bold leading-snug text-ink md:text-[28px]">
             {b.headline}
           </h2>
         </div>
-        <div className="shrink-0 md:text-right">
-          <p className="text-meta text-ink-dim">{b.span} 매출</p>
-          <p className="tabular text-kpi font-bold tracking-tight text-ink">{formatKRW(b.revenue.value)}</p>
-          {b.revenueDelta != null ? (
-            <p className={`tabular text-meta font-semibold ${up ? "text-positive" : "text-negative"}`}>
-              {signedKRW(b.revenueDelta)} <span className="font-medium text-ink-dim">· 이전 {formatKRW(b.revenue.prevValue)}</span>
-            </p>
-          ) : (
-            <p className="text-meta text-ink-dim">이전 같은 기간 데이터 없음</p>
-          )}
+        <div className="flex shrink-0 items-end gap-5 md:text-right">
+          {trend.length > 1 && <Sparkline values={trend} width={112} height={40} className="mb-1 hidden sm:block" />}
+          <div>
+            <p className="text-meta text-ink-dim">{b.span} 매출</p>
+            <p className="tabular text-kpi font-bold text-ink">{formatKRW(b.revenue.value)}</p>
+            {b.revenueDelta != null ? (
+              <p className={`tabular text-meta font-semibold ${up ? "text-positive" : "text-negative"}`}>
+                {signedKRW(b.revenueDelta)} <span className="font-medium text-ink-dim">· 이전 {formatKRW(b.revenue.prevValue)}</span>
+              </p>
+            ) : (
+              <p className="text-meta text-ink-dim">이전 같은 기간 데이터 없음</p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -162,8 +182,11 @@ export default function BriefingPanel({ b, period, derived = [] }: { b: Briefing
         />
       </div>
 
-      <div className="border-t border-line bg-surface-soft px-5 pt-4 md:px-6">
-        <h3 className="text-meta font-semibold text-ink-dim">추천 다음 행동</h3>
+      <div className="border-t border-line bg-surface-soft px-5 pt-4 md:px-7">
+        <h3 className="flex items-center gap-2 text-meta font-semibold text-ink">
+          추천 다음 행동
+          <span className="font-normal text-ink-dim">· 근거가 있는 것만, 중요한 순서</span>
+        </h3>
         {b.actions.length ? (
           <ol className="divide-y divide-line">
             {b.actions.map((a, i) => (

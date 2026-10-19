@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Check, FileSpreadsheet, Info, Minus, Upload, X, XCircle } from "lucide-react";
 import { parseFile, ParseResult } from "@/lib/csv";
 import { capabilities, fitPreset } from "@/lib/capabilities";
@@ -14,6 +14,16 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const md = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8))}일`;
 
 const STEPS = ["파일 읽기", "열 인식", "분석 가능 항목", "기간", "품질 확인"];
+
+/** [열, 열면 보이는 분석, 필수 여부] */
+const COLUMN_GUIDE: [string, string, boolean][] = [
+  ["날짜 · 매출", "매출 추이, 이전 기간 비교, 급변 감지, 7일 예측", true],
+  ["주문 수", "객단가, 매출 원인 분해(주문 × 객단가)", false],
+  ["방문자", "전환율, 원인 분해(방문자 × 전환율 × 객단가)", false],
+  ["채널 · 상품", "어디서 변했는지 — 채널·상품별 기여", false],
+  ["광고비", "광고비 1원당 매출, 광고비 증감 대비 주문", false],
+  ["고객 수 · 재구매 고객", "재구매 비중", false],
+];
 
 function Section({ n, title, children, aside }: { n: number; title: string; children: React.ReactNode; aside?: React.ReactNode }) {
   return (
@@ -91,6 +101,13 @@ export default function UploadPanel() {
   }, []);
 
   const caps = useMemo(() => (result && result.rows.length ? capabilities(result.rows, result.derived) : []), [result]);
+
+  // 진단 화면의 하단 고정 버튼이 떠 있는 동안 표시(globals.css의 body.cta-open)
+  useEffect(() => {
+    if (phase !== "ready") return;
+    document.body.classList.add("cta-open");
+    return () => document.body.classList.remove("cta-open");
+  }, [phase]);
 
   const reset = () => {
     setPhase("idle");
@@ -177,7 +194,7 @@ export default function UploadPanel() {
     const used = (result.mapping ?? []).filter((m) => m.field).length;
 
     return (
-      <div className="card">
+      <div className="card mb-20 sm:mb-0">
         <div className="flex flex-wrap items-center gap-3 p-5 md:p-6">
           <FileSpreadsheet className="h-6 w-6 shrink-0 text-brand" aria-hidden />
           <div className="min-w-0 flex-1">
@@ -290,13 +307,25 @@ export default function UploadPanel() {
           )}
         </Section>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface-soft px-5 py-4 md:px-6">
+        {/* 넓은 화면은 진단 끝에, 좁은 화면은 하단 탭 위에 고정해 언제든 시작할 수 있게 한다 */}
+        <div className="hidden flex-wrap items-center justify-between gap-3 border-t border-line bg-surface-soft px-5 py-4 sm:flex md:px-6">
           <p className="text-meta text-ink-soft">
             {warnings ? "위 내용을 반영해 분석합니다. 원본을 고쳐 다시 올려도 됩니다." : "바로 분석할 수 있는 파일입니다."}
           </p>
           <button onClick={begin} className={btn.primary}>
             이대로 분석 시작
           </button>
+        </div>
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-30 border-t border-line bg-surface/95 px-4 py-3 shadow-[0_-8px_24px_-18px_rgba(24,28,36,0.3)] backdrop-blur-md sm:hidden">
+          <div className="flex items-center gap-3">
+            <p className="min-w-0 flex-1 text-meta text-ink-soft">
+              <span className="block truncate font-semibold text-ink">{fileName}</span>
+              {warnings ? `확인할 점 ${warnings}건 반영` : "문제 없음"}
+            </p>
+            <button onClick={begin} className={`${btn.primary} shrink-0`}>
+              이대로 분석 시작
+            </button>
+          </div>
         </div>
 
         <details className="group border-t border-line">
@@ -312,46 +341,82 @@ export default function UploadPanel() {
   }
 
   return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDragOver(true);
-      }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const file = e.dataTransfer.files?.[0];
-        if (file) handleFile(file);
-      }}
-      className={`flex flex-col items-center justify-center rounded-card border-2 border-dashed px-6 py-10 text-center transition-colors ${
-        dragOver ? "border-brand bg-brand-soft" : "border-line-strong bg-surface"
-      }`}
-    >
-      <Upload className="h-7 w-7 text-ink-dim" aria-hidden />
-      <p className="mt-3 text-body font-semibold text-ink">
-        <span className="hidden sm:inline">CSV·XLSX 파일을 끌어다 놓거나 선택하세요</span>
-        <span className="sm:hidden">CSV·XLSX 파일을 선택하세요</span>
-      </p>
-      <p className="mt-1 text-meta text-ink-dim">필수 열은 날짜·매출 · 최대 10MB · 파일은 서버로 보내지 않고 브라우저에서 읽습니다</p>
-      <button onClick={() => inputRef.current?.click()} className={`${btn.primary} mt-5`}>
-        파일 선택
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".csv,.xlsx,.xls"
-        className="sr-only"
-        aria-label="분석할 파일 선택"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          const file = e.dataTransfer.files?.[0];
           if (file) handleFile(file);
         }}
-      />
-      <p className="mt-4 max-w-md text-meta text-ink-dim">
-        올리면 바로 분석하지 않고, 어떤 열을 인식했는지·무엇을 분석할 수 있는지·데이터에 문제가 없는지 먼저 보여드립니다.
-      </p>
-      <div className="mt-2">{samples}</div>
+        className={`flex flex-col items-center justify-center rounded-card border-2 border-dashed px-6 py-10 text-center transition-colors ${
+          dragOver ? "border-brand bg-brand-soft" : "border-line-strong bg-surface hover:border-brand/50"
+        }`}
+      >
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-soft text-brand" aria-hidden>
+          <Upload className="h-6 w-6" />
+        </span>
+        <p className="mt-4 text-body font-semibold text-ink">
+          <span className="hidden sm:inline">CSV·XLSX 파일을 끌어다 놓거나 선택하세요</span>
+          <span className="sm:hidden">CSV·XLSX 파일을 선택하세요</span>
+        </p>
+        <p className="mt-1 text-meta text-ink-dim">최대 10MB · 파일은 서버로 보내지 않고 브라우저에서 읽습니다</p>
+        <button onClick={() => inputRef.current?.click()} className={`${btn.primary} mt-5 px-6`}>
+          파일 선택
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          className="sr-only"
+          aria-label="분석할 파일 선택"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFile(file);
+          }}
+        />
+        <ol className="mt-6 flex flex-wrap justify-center gap-x-3 gap-y-1 text-caption text-ink-dim" aria-label="올린 뒤 진행 순서">
+          {["열 인식", "분석 가능 항목", "기간", "품질 확인", "분석 시작"].map((s, i) => (
+            <li key={s} className="flex items-center gap-1">
+              <span className="tabular flex h-4 w-4 items-center justify-center rounded-full bg-surface-soft text-[11px] font-bold text-ink-soft ring-1 ring-line">
+                {i + 1}
+              </span>
+              {s}
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {/* 어떤 열이 있으면 무엇을 볼 수 있는지 — 올리기 전에 파일을 준비할 수 있게 */}
+      <aside className="card p-5 md:p-6" aria-labelledby="columns-guide">
+        <h3 id="columns-guide" className="text-sub font-bold text-ink">
+          열에 따라 볼 수 있는 분석
+        </h3>
+        <p className="mt-1 text-meta text-ink-dim">영문·한글 헤더 모두 읽습니다</p>
+        <ul className="mt-4 space-y-2.5">
+          {COLUMN_GUIDE.map(([cols, unlock, required]) => (
+            <li key={cols} className="flex items-start gap-3 text-sub">
+              <span
+                className={`mt-0.5 shrink-0 rounded-[6px] px-1.5 py-0.5 text-caption font-semibold ${
+                  required ? "bg-brand text-white" : "bg-surface-soft text-ink-soft ring-1 ring-line"
+                }`}
+              >
+                {required ? "필수" : "선택"}
+              </span>
+              <span className="min-w-0">
+                <span className="font-semibold text-ink">{cols}</span>
+                <span className="block text-meta text-ink-soft">{unlock}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-5 border-t border-line pt-3">{samples}</div>
+      </aside>
     </div>
   );
 }

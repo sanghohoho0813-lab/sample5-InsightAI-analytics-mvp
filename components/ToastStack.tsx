@@ -16,7 +16,9 @@ export default function ToastStack() {
         <div
           key={t.id}
           role="status"
-          className="card animate-fade-in pointer-events-auto flex w-full items-start gap-3 px-4 py-3 text-sub shadow-overlay"
+          className={`card animate-fade-in pointer-events-auto flex w-full items-start gap-3 border-l-[3px] px-4 py-3 text-sub shadow-overlay ${
+            t.type === "success" ? "border-l-positive" : t.type === "error" ? "border-l-negative" : "border-l-brand"
+          }`}
         >
           {t.type === "success" && <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-positive" aria-hidden />}
           {t.type === "error" && <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-negative" aria-hidden />}

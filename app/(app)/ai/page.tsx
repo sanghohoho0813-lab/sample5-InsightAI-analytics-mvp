@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, LoaderCircle, Search } from "lucide-react";
+import { ArrowRight, ChevronRight, LoaderCircle, Search } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import EmptyState from "@/components/EmptyState";
@@ -159,16 +159,20 @@ export default function AiQueryPage() {
 
         <div className="mt-5">
           <h3 className="text-meta font-semibold text-ink-soft">이 데이터에서 바로 답할 수 있는 질문</h3>
-          <ul className="mt-2 flex flex-wrap gap-2">
+          <ul className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {suggestions.map((s) => (
               <li key={s.question}>
+                {/* 좁은 화면에서는 한 줄짜리 목록, 넓은 화면에서는 알약 모양 */}
                 <button
                   onClick={() => ask(s.question)}
                   disabled={!!pending}
-                  className="flex min-h-11 items-center gap-2 rounded-full border border-line-strong bg-surface px-4 text-left text-sub text-ink transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+                  className="flex w-full items-center gap-3 rounded-control border border-line-strong bg-surface px-4 py-3 text-left text-sub text-ink transition-colors hover:border-brand hover:text-brand disabled:opacity-50 sm:min-h-11 sm:w-auto sm:rounded-full sm:py-0"
                 >
-                  {s.question}
-                  <span className="text-caption text-ink-dim">{s.hint}</span>
+                  <span className="min-w-0 flex-1">
+                    {s.question}
+                    <span className="mt-0.5 block text-caption text-ink-dim sm:ml-2 sm:mt-0 sm:inline">{s.hint}</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-ink-dim sm:hidden" aria-hidden />
                 </button>
               </li>
             ))}

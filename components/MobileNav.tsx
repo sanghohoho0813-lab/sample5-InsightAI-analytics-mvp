@@ -28,10 +28,10 @@ export default function MobileNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line/80 bg-surface/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-18px_rgba(24,28,36,0.25)] backdrop-blur-md lg:hidden"
       aria-label="하단 메뉴"
     >
-      <div className="mx-auto grid h-16 max-w-lg grid-cols-5">
+      <div className="mx-auto grid h-[64px] max-w-lg grid-cols-5 px-1">
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href) || (href === "/more" && inMore);
           return (
@@ -39,22 +39,23 @@ export default function MobileNav() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className={`flex flex-col items-center justify-center gap-1 transition-colors ${
+              className={`flex flex-col items-center justify-center gap-0.5 transition-colors ${
                 active ? "text-brand" : "text-ink-dim hover:text-ink-soft"
               }`}
             >
-              <span className="relative">
-                <Icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.2 : 1.8} aria-hidden />
+              {/* 활성 탭은 아이콘 뒤에 옅은 알약 모양을 깐다 */}
+              <span className={`relative flex h-8 w-14 items-center justify-center rounded-full transition-colors ${active ? "bg-brand-soft" : ""}`}>
+                <Icon className="h-[21px] w-[21px]" strokeWidth={active ? 2.2 : 1.8} aria-hidden />
                 {href === "/anomalies" && unread > 0 && (
                   <span
-                    className="tabular absolute -right-2.5 -top-1.5 min-w-[18px] rounded-full bg-negative px-1 text-center text-[12px] font-bold leading-[18px] text-white"
+                    className="tabular absolute right-1 -top-1 min-w-[18px] rounded-full bg-negative px-1 text-center text-[12px] font-bold leading-[18px] text-white ring-2 ring-surface"
                     aria-label={`미확인 ${unread}건`}
                   >
                     {unread}
                   </span>
                 )}
               </span>
-              <span className="text-caption font-medium">{label}</span>
+              <span className={`text-caption ${active ? "font-semibold" : "font-medium"}`}>{label}</span>
             </Link>
           );
         })}

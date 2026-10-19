@@ -9,7 +9,7 @@ import Logo from "./Logo";
 function DemoBadge() {
   return (
     <span
-      className="shrink-0 whitespace-nowrap rounded-full border border-line-strong px-2 py-0.5 text-caption font-semibold text-ink-soft"
+      className="shrink-0 whitespace-nowrap rounded-full border border-line-strong bg-surface px-2 py-0.5 text-caption font-semibold text-ink-soft"
       title="규칙 기반 분석 엔진으로 동작하는 데모입니다. 데이터는 이 브라우저에만 저장됩니다."
     >
       데모
@@ -23,8 +23,8 @@ function DemoBadge() {
  */
 export default function TopBar() {
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 backdrop-blur">
-      <div className="hidden h-14 items-center gap-2 px-6 lg:flex">
+    <header className="sticky top-0 z-30 border-b border-line/80 bg-canvas/85 backdrop-blur-md">
+      <div className="hidden h-[60px] items-center gap-2 px-6 lg:flex xl:px-8">
         <DatasetSwitcher />
         <DemoBadge />
         <DateLine className="ml-auto text-meta font-medium text-ink" />
