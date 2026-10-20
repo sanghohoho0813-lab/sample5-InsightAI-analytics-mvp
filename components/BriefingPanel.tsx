@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import { Briefing, BriefPoint } from "@/lib/briefing";
 import { useDrill } from "@/lib/drill";
+import { actionKey, useApp } from "@/lib/store";
 import { signedKRW } from "@/lib/drivers";
 import { formatKRW } from "@/lib/format";
 import { DerivedField, Recommendation } from "@/lib/types";
@@ -91,34 +92,74 @@ function Cell({
   );
 }
 
-/** 실행 제안 한 줄 — 무엇을(제목) → 어떻게(설명) → 왜(근거) */
+const DONE_AT = new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" });
+
+/**
+ * 실행 제안 한 줄 — 무엇을(제목) → 어떻게(설명) → 왜(근거).
+ * 왼쪽 동그라미로 '했어요'를 표시해 두면(이 브라우저에 저장) 다음에 열었을 때 남은 일만 눈에 들어온다.
+ */
 export function ActionItem({ a, n, compact = false }: { a: Recommendation; n: number; compact?: boolean }) {
   const { follow } = useDrill();
+  const { dataset, doneActions, toggleAction } = useApp();
+  const key = dataset ? actionKey(dataset.id, a.title) : null;
+  const doneAt = key ? doneActions[key] : undefined;
   const p = PRIORITY[a.priority];
   const body = (
     <>
-      <span className="tabular mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-caption font-bold text-ink-soft ring-1 ring-line-strong">
-        {n}
-      </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-body font-semibold text-ink">{a.title}</span>
-          <span className={`rounded-full px-2 py-0.5 text-caption font-semibold ${p.cls}`}>{p.label}</span>
+          <span className={`text-body font-semibold ${doneAt ? "text-ink-soft line-through decoration-ink-dim/50" : "text-ink"}`}>{a.title}</span>
+          {doneAt ? (
+            <span className="rounded-full bg-positive-soft px-2 py-0.5 text-caption font-semibold text-positive">
+              완료 · {DONE_AT.format(new Date(doneAt))}
+            </span>
+          ) : (
+            <span className={`rounded-full px-2 py-0.5 text-caption font-semibold ${p.cls}`}>{p.label}</span>
+          )}
         </span>
-        <span className="mt-1 block text-sub text-ink-soft">{a.description}</span>
-        {!compact && <span className="mt-1 block text-meta text-ink-dim">근거 · {a.evidence}</span>}
+        {!doneAt && <span className="mt-1 block text-sub text-ink-soft">{a.description}</span>}
+        {!compact && !doneAt && <span className="mt-1 block text-meta text-ink-dim">근거 · {a.evidence}</span>}
       </span>
       {a.link && <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-ink-dim" aria-hidden />}
     </>
   );
-  const cls = "flex w-full items-start gap-3 py-4 text-left";
-  return a.link ? (
-    <button onClick={() => follow(a.link!, a.title)} className={`${cls} rounded-control transition-colors hover:bg-surface/70`}>
-      {body}
-    </button>
-  ) : (
-    <div className={cls}>{body}</div>
+  const cls = "flex min-w-0 flex-1 items-start gap-3 text-left";
+  return (
+    <div className="flex items-start gap-3 py-4">
+      {key ? (
+        <button
+          role="checkbox"
+          aria-checked={!!doneAt}
+          aria-label={`했어요: ${a.title}`}
+          title={doneAt ? "완료 표시 취소" : "했으면 눌러 완료로 표시"}
+          onClick={() => toggleAction(key)}
+          className={`tabular mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-caption font-bold transition-colors ${
+            doneAt ? "bg-positive text-white" : "bg-surface text-ink-soft ring-1 ring-line-strong hover:text-positive hover:ring-positive"
+          }`}
+        >
+          {doneAt ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> : n}
+        </button>
+      ) : (
+        <span className="tabular mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-caption font-bold text-ink-soft ring-1 ring-line-strong">
+          {n}
+        </span>
+      )}
+      {a.link ? (
+        <button onClick={() => follow(a.link!, a.title)} className={`${cls} -my-1 rounded-control py-1 transition-colors hover:bg-surface/70`}>
+          {body}
+        </button>
+      ) : (
+        <div className={cls}>{body}</div>
+      )}
+    </div>
   );
+}
+
+/** 할 일 진행 — '3개 중 1개 완료' */
+export function useActionProgress(actions: Recommendation[]) {
+  const { dataset, doneActions } = useApp();
+  const done = dataset ? actions.filter((a) => doneActions[actionKey(dataset.id, a.title)]).length : 0;
+  return { done, total: actions.length };
 }
 
 /**
@@ -140,6 +181,7 @@ export default function BriefingPanel({
   const up = (b.revenueDelta ?? 0) >= 0;
   const NAMES: Partial<Record<DerivedField, string>> = { orders: "주문 수", channel: "채널", product: "상품", adSpend: "광고비" };
   const missingCols = derived.map((f) => NAMES[f]).filter(Boolean).join("·");
+  const progress = useActionProgress(b.actions);
   return (
     <section className="card overflow-hidden shadow-raised" aria-labelledby="brief-title">
       {/* 머리 — 옅은 브랜드 톤 위에 한 문장 결론, 오른쪽에 매출과 흐름 */}
@@ -183,9 +225,14 @@ export default function BriefingPanel({
       </div>
 
       <div className="border-t border-line bg-surface-soft px-5 pt-4 md:px-7">
-        <h3 className="flex items-center gap-2 text-meta font-semibold text-ink">
+        <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta font-semibold text-ink">
           추천 다음 행동
           <span className="font-normal text-ink-dim">· 근거가 있는 것만, 중요한 순서</span>
+          {progress.done > 0 && (
+            <span className="ml-auto rounded-full bg-positive-soft px-2 py-0.5 text-caption font-semibold text-positive">
+              {progress.total}개 중 {progress.done}개 완료
+            </span>
+          )}
         </h3>
         {b.actions.length ? (
           <ol className="divide-y divide-line">

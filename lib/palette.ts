@@ -10,6 +10,7 @@ export const COLORS = {
   grid: "#ebe8e1",
   positive: "#147a49",
   warning: "#965b0d",
+  caution: "#c97d12", // 그래프 속 '주의' 막대·선(글자용 warning보다 밝게)
   negative: "#bf3b2b",
   ink: "#1f232a",
   dim: "#646b76",

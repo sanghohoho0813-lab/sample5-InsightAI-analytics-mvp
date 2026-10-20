@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
@@ -84,6 +84,25 @@ export default function InvestigationView({ anomaly, queue, from }: { anomaly: A
     return () => window.removeEventListener("keydown", onKey);
   }, [prev, next, go]);
 
+  // 휴대폰에서는 옆으로 밀어 넘긴다 — 차트·가로로 넘치는 표 위에서 민 것은 무시한다.
+  const touch = useRef<{ x: number; y: number; t: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const el = e.target as HTMLElement;
+    touch.current = el.closest(".recharts-wrapper, .overflow-x-auto, input, select, textarea")
+      ? null
+      : { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s0 = touch.current;
+    touch.current = null;
+    if (!s0) return;
+    const dx = e.changedTouches[0].clientX - s0.x;
+    const dy = e.changedTouches[0].clientY - s0.y;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6 || Date.now() - s0.t > 700) return;
+    if (dx < 0 && next) go(next);
+    if (dx > 0 && prev) go(prev);
+  };
+
   const backLink = (
     <Link href={from ?? "/anomalies"} className="inline-flex min-h-11 min-w-0 items-center gap-1 text-sub font-semibold text-ink-soft hover:text-ink">
       <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden /> <span className="truncate">{from ? `${josa(back, "으로")} 돌아가기` : back}</span>
@@ -128,7 +147,7 @@ export default function InvestigationView({ anomaly, queue, from }: { anomaly: A
   return (
     <>
       {triageBar}
-      <div key={anomaly.id} className="animate-fade-in">
+      <div key={anomaly.id} className="animate-fade-in" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-dim">
@@ -298,7 +317,10 @@ export default function InvestigationView({ anomaly, queue, from }: { anomaly: A
         {next ? (
           <>
             <div className="min-w-0">
-              <p className="eyebrow">다음 변화 · {index + 2} / {queue.length}</p>
+              <p className="eyebrow">
+                다음 변화 · {index + 2} / {queue.length}
+                <span className="font-medium normal-case text-ink-dim sm:hidden"> · 옆으로 밀어도 넘어갑니다</span>
+              </p>
               <p className="mt-0.5 truncate text-body font-semibold text-ink">
                 <span className={SEVERITY_META[next.severity].text}>[{SEVERITY_META[next.severity].label}]</span> {next.title}
               </p>

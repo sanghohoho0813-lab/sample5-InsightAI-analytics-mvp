@@ -4,7 +4,6 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { formatDateKR, josa } from "@/lib/format";
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import FilterToolbar from "@/components/FilterToolbar";
@@ -12,11 +11,10 @@ import EmptyState from "@/components/EmptyState";
 import MetricTabs from "@/components/MetricTabs";
 import { Panel, PanelHeader } from "@/components/Panel";
 import RevenueTrendChart from "@/components/charts/RevenueTrendChart";
-import ChartTooltip from "@/components/charts/ChartTooltip";
+import BreakdownTable from "@/components/BreakdownTable";
 import { useApp } from "@/lib/store";
-import { computeKpis, exploreSeries, trendSeries } from "@/lib/analytics-engine";
-import { formatAxisKRW, formatKRW, formatNumber } from "@/lib/format";
-import { COLORS } from "@/lib/palette";
+import { breakdownRows, computeKpis, trendSeries } from "@/lib/analytics-engine";
+import { formatKRW, formatNumber } from "@/lib/format";
 import { DerivedField, MetricKey } from "@/lib/types";
 import { anomaliesFor, availableKpis, canSplit } from "@/lib/dataset-meta";
 import { comparisonLabel } from "@/lib/report";
@@ -90,7 +88,7 @@ function AnalyticsView() {
       kpis: availableKpis(computeKpis(dataset.rows, filters), dataset),
       anomalies: anomaliesFor(dataset, filters),
       trend: trendSeries(dataset.rows, filters),
-      breakdown: exploreSeries(dataset.rows, breakFilters, breakMetric, dimension),
+      breakdown: breakdownRows(dataset.rows, breakFilters, breakMetric, dimension),
     };
   }, [dataset, filters, dimension, breakMetric]);
 
@@ -108,8 +106,6 @@ function AnalyticsView() {
   const isPct = breakMetric === "conversionRate";
   const isMoney = breakMetric === "revenue" || breakMetric === "adSpend";
   const fmt = (v: number) => (isPct ? `${v.toFixed(2)}%` : isMoney ? formatKRW(v) : formatNumber(v));
-  const total = data.breakdown.reduce((a, s) => a + s.value, 0) || 1;
-  const maxValue = Math.max(...data.breakdown.map((b) => b.value), 1);
   const selectedName = dimension === "channel" ? filters.channel : dimension === "product" ? filters.product : "all";
   const canDrill = dimension !== "customerType";
   const estimated = dimension === "customerType" && !["customers", "orders"].includes(breakMetric);
@@ -160,7 +156,7 @@ function AnalyticsView() {
               : estimated
                 ? "고객 유형별 금액은 고객 수 비율로 나눈 추정치입니다."
                 : canDrill
-                  ? "행을 누르면 그 항목으로 범위를 좁히고, 다시 누르면 해제됩니다."
+                  ? "이름을 누르면 그 항목으로 범위를 좁히고, 다시 누르면 해제됩니다 · 열 머리로 정렬"
                   : undefined
           }
           action={
@@ -193,83 +189,16 @@ function AnalyticsView() {
         {unavailable ? (
           <p className="px-5 py-10 text-center text-sub text-ink-dim md:px-6">다른 지표를 선택해주세요.</p>
         ) : (
-          <div className="grid gap-2 p-5 md:p-6 lg:grid-cols-[1fr_1fr] lg:gap-8">
-            {/* 막대 차트는 넓은 화면에서만 — 좁은 화면에서는 아래 표의 막대로 읽는다 */}
-            <div className="hidden h-[240px] min-w-0 lg:block" aria-hidden>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.breakdown} layout="vertical" margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid stroke={COLORS.grid} horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tickFormatter={(v: number) => (isPct ? `${v}%` : isMoney ? formatAxisKRW(v) : formatNumber(v))}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} width={96} />
-                  <Tooltip
-                    cursor={{ fill: COLORS.brandSoft }}
-                    content={({ active, payload }) =>
-                      active && payload?.length ? (
-                        <ChartTooltip rows={[{ name: String(payload[0].payload.name), value: fmt(Number(payload[0].value)), color: COLORS.brand }]} />
-                      ) : null
-                    }
-                  />
-                  <Bar
-                    dataKey="value"
-                    radius={[0, 4, 4, 0]}
-                    maxBarSize={22}
-                    animationDuration={500}
-                    onClick={(d: { name?: string }) => d?.name && pick(d.name)}
-                    className={canDrill ? "cursor-pointer" : ""}
-                  >
-                    {data.breakdown.map((b) => (
-                      <Cell
-                        key={b.name}
-                        fill={selectedName === "all" || selectedName === b.name ? COLORS.brand : "#c5d6f2"}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <table className="w-full text-sub">
-              <thead>
-                <tr className="border-b border-line text-left text-caption text-ink-dim">
-                  <th className="py-2 font-semibold">{DIMENSIONS.find((d) => d.value === dimension)!.label}</th>
-                  <th className="py-2 text-right font-semibold">값</th>
-                  <th className="py-2 text-right font-semibold">비중</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.breakdown.map((b) => {
-                  const on = selectedName === b.name;
-                  return (
-                    <tr
-                      key={b.name}
-                      onClick={() => pick(b.name)}
-                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), pick(b.name))}
-                      tabIndex={canDrill ? 0 : undefined}
-                      aria-selected={canDrill ? on : undefined}
-                      className={`border-b border-line/70 last:border-0 ${canDrill ? "cursor-pointer hover:bg-surface-soft" : ""} ${on ? "bg-brand-soft/60" : ""}`}
-                    >
-                      <td className={`py-3 pr-2 ${on ? "font-semibold text-brand" : "text-ink"}`}>
-                        {b.name}
-                        <span className="mt-1.5 block h-1.5 rounded-full bg-surface-soft lg:hidden" aria-hidden>
-                          <span
-                            className="block h-full rounded-full bg-brand"
-                            style={{ width: `${(b.value / maxValue) * 100}%`, opacity: selectedName === "all" || on ? 1 : 0.35 }}
-                          />
-                        </span>
-                      </td>
-                      <td className="tabular py-3 text-right font-semibold text-ink">{fmt(b.value)}</td>
-                      <td className="tabular py-3 pl-2 text-right text-ink-soft">
-                        {isPct ? "–" : `${((b.value / total) * 100).toFixed(1)}%`}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="px-5 pb-3 pt-2 md:px-6">
+            <BreakdownTable
+              rows={data.breakdown}
+              dimLabel={DIMENSIONS.find((d) => d.value === dimension)!.label}
+              fmt={fmt}
+              rate={isPct}
+              neutralChange={breakMetric === "adSpend"}
+              selected={selectedName}
+              onPick={canDrill ? pick : undefined}
+            />
           </div>
         )}
       </Panel>

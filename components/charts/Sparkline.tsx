@@ -9,6 +9,7 @@ export default function Sparkline({
   color = "#1478ff",
   fill = true,
   stretch = false,
+  highlight,
   className = "",
 }: {
   values: number[];
@@ -18,6 +19,8 @@ export default function Sparkline({
   fill?: boolean;
   /** 부모 폭에 맞춰 늘린다(선 굵기는 유지, 끝점 표시는 생략) */
   stretch?: boolean;
+  /** 강조할 구간(값 위치) — 옅은 띠와 그 구간의 선을 다른 색으로 그린다 */
+  highlight?: { from: number; to: number; color: string };
   className?: string;
 }) {
   if (values.length < 2) return null;
@@ -33,6 +36,16 @@ export default function Sparkline({
   const area = `${line} L${width},${height} L0,${height} Z`;
   const id = `spark-${Math.round(values[0])}-${values.length}-${color.replace("#", "")}`;
   const [lx, ly] = pts[pts.length - 1];
+  const step = width / (values.length - 1);
+  const hl = highlight && {
+    ...highlight,
+    x: Math.max(0, highlight.from * step - step / 2),
+    w: Math.min(width, highlight.to * step + step / 2) - Math.max(0, highlight.from * step - step / 2),
+    path: pts
+      .slice(Math.max(0, highlight.from - 1), Math.min(pts.length, highlight.to + 2))
+      .map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`)
+      .join(" "),
+  };
   return (
     <svg
       width={width}
@@ -54,6 +67,7 @@ export default function Sparkline({
           <path d={area} fill={`url(#${id})`} />
         </>
       )}
+      {hl && <rect x={hl.x} y={0} width={Math.max(hl.w, 2)} height={height} fill={hl.color} opacity={0.12} rx={2} />}
       <path
         d={line}
         fill="none"
@@ -63,7 +77,18 @@ export default function Sparkline({
         strokeLinecap="round"
         vectorEffect={stretch ? "non-scaling-stroke" : undefined}
       />
-      {!stretch && <circle cx={lx} cy={ly} r={2.5} fill={color} stroke="#fff" strokeWidth={1.5} />}
+      {hl && (
+        <path
+          d={hl.path}
+          fill="none"
+          stroke={hl.color}
+          strokeWidth={2.25}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          vectorEffect={stretch ? "non-scaling-stroke" : undefined}
+        />
+      )}
+      {!stretch && !hl && <circle cx={lx} cy={ly} r={2.5} fill={color} stroke="#fff" strokeWidth={1.5} />}
     </svg>
   );
 }

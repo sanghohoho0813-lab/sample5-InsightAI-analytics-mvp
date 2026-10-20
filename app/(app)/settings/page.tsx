@@ -76,7 +76,7 @@ export default function SettingsPage() {
         <div className="mt-2 divide-y divide-line">
           <Row
             label="처음 상태로 되돌리기"
-            desc={`분석 기록 ${history.length}건, 저장한 보고서 ${reports.length}건, 업로드 파일, 확인 표시, 설정을 모두 지우고 샘플 데이터로 다시 시작합니다.`}
+            desc={`분석 기록 ${history.length}건, 저장한 보고서 ${reports.length}건, 업로드 파일, 확인·완료 표시, 설정을 모두 지우고 샘플 데이터로 다시 시작합니다.`}
           >
             {confirming ? (
               <div className="flex gap-2">

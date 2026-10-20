@@ -149,6 +149,17 @@ export interface ForecastPoint {
   upper: number | null;
 }
 
+export interface ForecastBacktest {
+  /** 가린 7일 — 실제 값과 그때 했을 예측 */
+  days: { date: string; actual: number; forecast: number; lower: number; upper: number }[];
+  /** 7일 합계 오차율(%) */
+  totalErrorPct: number;
+  /** 하루 평균 오차율(%) */
+  dailyErrorPct: number;
+  /** 실제 값이 예상 범위 안에 든 날 수 */
+  withinRange: number;
+}
+
 export interface ForecastSummary {
   key: "revenue" | "orders" | "customers";
   label: string;
@@ -156,6 +167,10 @@ export interface ForecastSummary {
   changePct: number;
   format: "currency" | "number";
   points: ForecastPoint[];
+  /** 예측의 근거 — 최근 7일 하루 평균, 하루 추세(%) */
+  basis?: { recentAvg: number; dailyGrowthPct: number };
+  /** 지난 7일로 해 본 검증 — 데이터가 21일보다 짧으면 null */
+  backtest?: ForecastBacktest | null;
 }
 
 export interface AnalysisRecord {

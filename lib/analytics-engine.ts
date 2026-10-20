@@ -320,3 +320,82 @@ export function exploreSeries(
     }))
     .sort((a, b) => b.value - a.value);
 }
+
+export type BreakMetric = "revenue" | "orders" | "customers" | "conversionRate" | "adSpend";
+export type BreakDimension = "channel" | "product" | "customerType";
+
+export interface BreakdownRow {
+  name: string;
+  value: number;
+  /** 이전 같은 기간 값 — 비교할 기간이 없으면 null */
+  prev: number | null;
+  /** 변화율(%) — 전환율은 %p 차이. 이전 값이 0이거나 비교 불가면 null */
+  change: number | null;
+  /** 합계에서 차지하는 비중(%) — 전환율처럼 더할 수 없는 지표는 null */
+  share: number | null;
+  /** 이번 기간 일별 값(항목별 흐름) */
+  trend: number[];
+}
+
+/**
+ * 분석 화면의 분해 표 — 항목마다 이번 기간 · 이전 같은 기간 · 변화 · 비중 · 일별 흐름.
+ * 값은 exploreSeries와 같은 계산을 쓰고, 이전 기간은 같은 길이의 직전 구간이다.
+ */
+export function breakdownRows(rows: DataRow[], filters: Filters, metric: BreakMetric, dimension: BreakDimension): BreakdownRow[] {
+  const cur = exploreSeries(rows, filters, metric, dimension);
+  const { currentDates, previousDates } = resolveDates(rows, filters);
+  const comparable = currentDates.length > 0 && previousDates.length === currentDates.length;
+  const prevList = comparable
+    ? exploreSeries(
+        rows,
+        { ...filters, preset: "custom", rangeDays: previousDates.length, range: { start: previousDates[0], end: previousDates[previousDates.length - 1] } },
+        metric,
+        dimension
+      )
+    : [];
+  const rate = metric === "conversionRate";
+  const total = cur.reduce((a, r) => a + r.value, 0);
+
+  // 항목별 일별 흐름 — 고객 유형은 원본에 있는 고객·주문 수만 날짜별로 나눌 수 있다.
+  const { current } = applyFilters(rows, filters);
+  const idx = new Map(currentDates.map((d, i) => [d, i]));
+  const trends = new Map<string, { a: number[]; b: number[] }>();
+  const slot = (name: string) => {
+    if (!trends.has(name)) trends.set(name, { a: currentDates.map(() => 0), b: currentDates.map(() => 0) });
+    return trends.get(name)!;
+  };
+  if (dimension !== "customerType") {
+    for (const r of current) {
+      const i = idx.get(r.date);
+      if (i == null) continue;
+      const t = slot(r[dimension]);
+      if (rate) {
+        t.a[i] += r.orders;
+        t.b[i] += r.visitors;
+      } else {
+        t.a[i] += metric === "revenue" ? r.revenue : metric === "orders" ? r.orders : metric === "customers" ? r.customers : r.adSpend;
+      }
+    }
+  } else if (metric === "customers" || metric === "orders") {
+    for (const r of current) {
+      const i = idx.get(r.date);
+      if (i == null) continue;
+      slot("신규 고객").a[i] += r.newCustomers;
+      slot("재구매 고객").a[i] += r.returningCustomers;
+    }
+  }
+
+  return cur.map((c) => {
+    const p = comparable ? (prevList.find((x) => x.name === c.name)?.value ?? 0) : null;
+    const change = p == null ? null : rate ? +(c.value - p).toFixed(2) : p > 0 ? +(((c.value - p) / p) * 100).toFixed(1) : null;
+    const t = trends.get(c.name);
+    return {
+      name: c.name,
+      value: c.value,
+      prev: p,
+      change,
+      share: rate || total <= 0 ? null : +((c.value / total) * 100).toFixed(1),
+      trend: t ? (rate ? t.a.map((o, i) => (t.b[i] > 0 ? (o / t.b[i]) * 100 : 0)) : t.a) : [],
+    };
+  });
+}

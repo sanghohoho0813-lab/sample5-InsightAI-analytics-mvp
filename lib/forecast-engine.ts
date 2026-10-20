@@ -1,5 +1,5 @@
 import { dailySeries, uniqueDates } from "./analytics-engine";
-import { DataRow, ForecastPoint, ForecastSummary } from "./types";
+import { DataRow, ForecastBacktest, ForecastPoint, ForecastSummary } from "./types";
 
 /**
  * 데모 예측 로직: 최근 14일 이동평균 + 최근 성장률 기반 외삽.
@@ -34,7 +34,32 @@ function forecastMetric(values: number[], dates: string[], horizon = 7) {
       upper: Math.round(level + sd * widen),
     });
   }
-  return { points, recentAvg, sd };
+  return { points, recentAvg, sd, dailyGrowth };
+}
+
+/**
+ * 이 예측을 얼마나 믿을 수 있나 — 마지막 7일을 가린 채 같은 방법으로 예측해 실제와 비교한다.
+ * 가린 7일 앞에도 예측에 필요한 14일이 있어야 하므로 21일 이상일 때만 계산한다.
+ */
+export function backtest(values: number[], dates: string[], horizon = 7): ForecastBacktest | null {
+  if (values.length < FORECAST_MIN_DAYS + horizon) return null;
+  const { points } = forecastMetric(values.slice(0, -horizon), dates.slice(0, -horizon), horizon);
+  const actual = values.slice(-horizon);
+  const days = points.map((p, i) => ({ date: dates[dates.length - horizon + i], actual: actual[i], forecast: p.forecast, lower: p.lower, upper: p.upper }));
+  const sumA = actual.reduce((a, b) => a + b, 0);
+  const sumF = points.reduce((a, p) => a + p.forecast, 0);
+  const daily = days.filter((d) => d.actual > 0).map((d) => Math.abs(d.forecast - d.actual) / d.actual);
+  return {
+    days,
+    totalErrorPct: sumA > 0 ? +((Math.abs(sumF - sumA) / sumA) * 100).toFixed(1) : 0,
+    dailyErrorPct: daily.length ? +((daily.reduce((a, b) => a + b, 0) / daily.length) * 100).toFixed(1) : 0,
+    withinRange: days.filter((d) => d.actual >= d.lower && d.actual <= d.upper).length,
+  };
+}
+
+/** 7일 합계 오차로 본 신뢰 수준 — 화면 문구가 같은 기준을 쓴다 */
+export function reliability(b: ForecastBacktest): "high" | "medium" | "low" {
+  return b.totalErrorPct <= 8 ? "high" : b.totalErrorPct <= 20 ? "medium" : "low";
 }
 
 /** 예측에는 최근 7일과 직전 7일 비교가 필요하다. 이보다 짧으면 예측하지 않는다. */
@@ -54,7 +79,7 @@ export function computeForecasts(rows: DataRow[], horizon = 7): ForecastSummary[
 
   return defs.map((def) => {
     const values = series.map((p) => p[def.key] as number);
-    const { points } = forecastMetric(values, dates, horizon);
+    const { points, recentAvg, dailyGrowth } = forecastMetric(values, dates, horizon);
     const next7Total = points.reduce((a, p) => a + p.forecast, 0);
     const last7Total = values.slice(-7).reduce((a, b) => a + b, 0);
     const changePct = last7Total > 0 ? +(((next7Total - last7Total) / last7Total) * 100).toFixed(1) : 0;
@@ -88,6 +113,8 @@ export function computeForecasts(rows: DataRow[], horizon = 7): ForecastSummary[
       changePct,
       format: def.format,
       points: [...history, ...future],
+      basis: { recentAvg: Math.round(recentAvg), dailyGrowthPct: +(dailyGrowth * 100).toFixed(2) },
+      backtest: backtest(values, dates, horizon),
     };
   });
 }

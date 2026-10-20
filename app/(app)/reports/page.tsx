@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowUp, FileText, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUp, CheckCircle2, FileText, Pencil, Search, Trash2, TriangleAlert } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import EmptyState from "@/components/EmptyState";
@@ -12,13 +12,16 @@ import { Panel, PanelHeader } from "@/components/Panel";
 import { useApp } from "@/lib/store";
 import { findDataset } from "@/lib/persist";
 import { BRAND } from "@/lib/brand";
-import { reportSignature, scopeLabel, scopeOf, summarize } from "@/lib/report";
+import { compareReports, previousReport, previousScope, reportSignature, scopeLabel, scopeOf, summarize } from "@/lib/report";
+import { uniqueDates } from "@/lib/analytics-engine";
+import Select from "@/components/Select";
 import { formatDateKR, formatKRW, formatNumber, formatValue } from "@/lib/format";
 import { SavedReport } from "@/lib/types";
 import { SEVERITY_META, btn, field } from "@/lib/ui";
 import { PRIORITY } from "@/components/BriefingPanel";
 
 const DATETIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
+const MONTH = new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long" });
 
 const SECTIONS = [
   { id: "r-summary", label: "핵심 요약" },
@@ -28,7 +31,7 @@ const SECTIONS = [
   { id: "r-actions", label: "권장 행동" },
   { id: "r-meta", label: "생성 시점" },
 ] as const;
-type SectionId = (typeof SECTIONS)[number]["id"];
+type SectionId = (typeof SECTIONS)[number]["id"] | "r-compare";
 
 const jumpTo = (id: string) => {
   const el = document.getElementById(id);
@@ -43,7 +46,15 @@ const jumpTo = (id: string) => {
  * 넓은 화면의 보고서 목차 — 지금 읽는 절을 표시하고, 누르면 그 절로 이동한다.
  * 절마다 건수를 붙여 위험·행동이 몇 개인지 펼치기 전에 보이게 한다.
  */
-function ReportToc({ counts }: { counts: Partial<Record<SectionId, { n: number; tone?: "negative" }>> }) {
+function ReportToc({
+  counts,
+  compare = false,
+}: {
+  counts: Partial<Record<SectionId, { n: number; tone?: "negative" }>>;
+  /** 지난 보고서와 비교가 있으면 목차 끝에 붙인다 */
+  compare?: boolean;
+}) {
+  const sections: { id: SectionId; label: string }[] = compare ? [...SECTIONS, { id: "r-compare", label: "지난 보고서와 비교" }] : [...SECTIONS];
   const [active, setActive] = useState<SectionId>(SECTIONS[0].id);
 
   useEffect(() => {
@@ -51,12 +62,12 @@ function ReportToc({ counts }: { counts: Partial<Record<SectionId, { n: number; 
     const update = () => {
       frame = 0;
       const bottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 8;
-      let current: SectionId = SECTIONS[0].id;
-      for (const { id } of SECTIONS) {
+      let current: SectionId = sections[0].id;
+      for (const { id } of sections) {
         const el = document.getElementById(id);
         if (el && el.getBoundingClientRect().top <= 160) current = id;
       }
-      setActive(bottom ? SECTIONS[SECTIONS.length - 1].id : current);
+      setActive(bottom ? sections[sections.length - 1].id : current);
     };
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(update);
@@ -69,13 +80,14 @@ function ReportToc({ counts }: { counts: Partial<Record<SectionId, { n: number; 
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 절 목록은 비교 유무로만 바뀐다
+  }, [compare]);
 
   return (
     <nav aria-label="보고서 목차" className="sticky top-[92px]">
       <p className="eyebrow">목차</p>
       <ol className="mt-3 space-y-0.5 border-l border-line">
-        {SECTIONS.map((s, i) => {
+        {sections.map((s, i) => {
           const on = active === s.id;
           const c = counts[s.id];
           return (
@@ -118,9 +130,115 @@ function ReportToc({ counts }: { counts: Partial<Record<SectionId, { n: number; 
   );
 }
 
+/**
+ * 지난 보고서와 비교 — 같은 데이터·대상의 앞선 기간 보고서가 있으면 지표 변화와 위험이 어떻게 달라졌는지 보여준다.
+ * 없으면 바로 앞 같은 길이 기간의 보고서를 한 번에 만들어 비교할 수 있게 한다.
+ */
+function ReportCompare({ report, prev }: { report: SavedReport; prev: SavedReport | null }) {
+  const { saveReport } = useApp();
+  const source = findDataset(report.datasetId);
+
+  if (!prev) {
+    const range = source ? previousScope(report, uniqueDates(source.rows)[0] ?? "") : null;
+    return (
+      <div className="no-print mt-6 flex flex-col gap-3 rounded-card border border-dashed border-line-strong px-5 py-5 sm:flex-row sm:items-center sm:justify-between md:px-8">
+        <div className="min-w-0">
+          <p className="text-sub font-semibold text-ink">지난 기간과 비교하기</p>
+          <p className="mt-0.5 text-meta text-ink-soft">
+            {range
+              ? `바로 앞 ${report.scope.days}일(${formatDateKR(range.start).slice(5)} ~ ${formatDateKR(range.end).slice(5)}) 보고서를 만들면, 지표와 위험이 어떻게 달라졌는지 여기서 비교합니다.`
+              : source
+                ? "데이터가 바로 앞 같은 길이 기간까지 거슬러 올라가지 않아 비교할 보고서를 만들 수 없습니다."
+                : "원본 데이터가 이 브라우저에 없어 비교할 보고서를 만들 수 없습니다."}
+          </p>
+        </div>
+        {range && source && (
+          <button
+            onClick={() =>
+              saveReport(undefined, {
+                dataset: source,
+                filters: { preset: "custom", rangeDays: report.scope.days, range, channel: report.scope.channel, product: report.scope.product },
+              })
+            }
+            className={`${btn.secondary} shrink-0`}
+          >
+            앞 기간 보고서 만들어 비교
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const c = compareReports(prev, report);
+  const fmtK = (v: number, f: SavedReport["kpis"][number]["format"]) => formatValue(v, f);
+  return (
+    <Panel as="section" className="mt-6 overflow-hidden" aria-labelledby="r-compare">
+      <div className="px-5 pt-7 md:px-12 md:pt-9">
+        <p className="eyebrow">지난 보고서와 비교</p>
+        <h2 id="r-compare" tabIndex={-1} className="mt-1 scroll-mt-24 text-card font-bold text-ink outline-none md:text-[20px]">
+          {formatDateKR(prev.scope.start).slice(5)} ~ {formatDateKR(prev.scope.end).slice(5)} → {formatDateKR(report.scope.start).slice(5)} ~{" "}
+          {formatDateKR(report.scope.end).slice(5)}
+        </h2>
+        <p className="mt-1 text-meta text-ink-soft">
+          <Link href={`/reports?id=${prev.id}`} className="font-semibold text-brand hover:underline">
+            {prev.title}
+          </Link>
+          과 비교 · {c.perDay ? "기간 길이가 달라 합계 지표는 하루 평균으로 맞췄습니다" : `두 보고서 모두 ${report.scope.days}일`}
+        </p>
+      </div>
+      <div className="mt-4 overflow-x-auto px-5 md:px-12">
+        <table className="w-full text-sub">
+          <caption className="sr-only">지난 보고서 대비 지표 변화</caption>
+          <thead>
+            <tr className="whitespace-nowrap border-b border-line text-left text-caption text-ink-dim">
+              <th scope="col" className="py-2 font-semibold">지표</th>
+              <th scope="col" className="hidden py-2 text-right font-semibold sm:table-cell">지난 보고서</th>
+              <th scope="col" className="py-2 text-right font-semibold">이 보고서</th>
+              <th scope="col" className="py-2 text-right font-semibold">변화</th>
+            </tr>
+          </thead>
+          <tbody>
+            {c.kpis.map((k) => (
+              <tr key={k.key} className="border-b border-line/70 last:border-0">
+                <td className="py-3 text-ink">{k.label}</td>
+                <td className="tabular hidden py-3 text-right text-ink-soft sm:table-cell">{fmtK(k.before, k.format)}</td>
+                <td className="tabular py-3 text-right font-semibold text-ink">{fmtK(k.after, k.format)}</td>
+                <td className={`tabular py-3 text-right font-semibold ${k.change >= 0 ? "text-positive" : "text-negative"}`}>
+                  {k.change >= 0 ? "+" : "−"}
+                  {Math.abs(k.change).toFixed(k.unit === "%p" ? 2 : 1)}
+                  {k.unit}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-6 grid gap-5 border-t border-line px-5 py-6 sm:grid-cols-2 md:px-12">
+        <div>
+          <h3 className="flex items-center gap-1.5 text-sub font-semibold text-ink">
+            <CheckCircle2 className="h-4 w-4 text-positive" aria-hidden /> 사라진 위험 {c.resolved.length}건
+          </h3>
+          <ul className="mt-2 space-y-1.5 text-meta text-ink-soft">
+            {c.resolved.length ? c.resolved.map((t) => <li key={t}>{t}</li>) : <li className="text-ink-dim">없음</li>}
+          </ul>
+        </div>
+        <div>
+          <h3 className="flex items-center gap-1.5 text-sub font-semibold text-ink">
+            <TriangleAlert className="h-4 w-4 text-negative" aria-hidden /> 새로 생긴 위험 {c.added.length}건
+          </h3>
+          <ul className="mt-2 space-y-1.5 text-meta text-ink-soft">
+            {c.added.length ? c.added.map((t) => <li key={t}>{t}</li>) : <li className="text-ink-dim">없음</li>}
+          </ul>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 function ReportDetail({ report }: { report: SavedReport }) {
   const router = useRouter();
-  const { dataset, deleteReport, renameReport, showToast, switchDataset, setCustomRange, setFilters } = useApp();
+  const { dataset, reports, deleteReport, renameReport, showToast, switchDataset, setCustomRange, setFilters } = useApp();
+  const prev = previousReport(report, reports);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(report.title);
   const source = findDataset(report.datasetId);
@@ -471,6 +589,8 @@ function ReportDetail({ report }: { report: SavedReport }) {
         </section>
       </Panel>
 
+      <ReportCompare report={report} prev={prev} />
+
       <div className="no-print mt-4 flex justify-end">
         <button
           onClick={() => {
@@ -486,6 +606,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
 
       <aside className="no-print hidden xl:block xl:pt-[60px]">
         <ReportToc
+          compare={!!prev}
           counts={{
             "r-findings": { n: findings.length },
             "r-risks": { n: risks.length + report.anomalies.length, tone: "negative" },
@@ -502,6 +623,23 @@ function ReportLibrary() {
   const { dataset, filters, reports, saveReport } = useApp();
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
+  const [q, setQ] = useState("");
+  const [order, setOrder] = useState<"recent" | "risk" | "period">("recent");
+
+  // 저장한 보고서 찾기 — 제목·데이터 이름·결론 문장으로 찾고, 최신 · 위험 많은 · 분석 기간 순으로 정렬한다.
+  const riskCount = (r: SavedReport) => r.findings.filter((f) => f.impact === "negative").length + r.anomalies.length;
+  const shown = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const list = term ? reports.filter((r) => `${r.title} ${r.datasetName} ${r.headline}`.toLowerCase().includes(term)) : reports;
+    return [...list].sort((a, b) =>
+      order === "risk"
+        ? riskCount(b) - riskCount(a) || b.createdAt.localeCompare(a.createdAt)
+        : order === "period"
+          ? b.scope.end.localeCompare(a.scope.end) || b.scope.start.localeCompare(a.scope.start)
+          : b.createdAt.localeCompare(a.createdAt)
+    );
+  }, [reports, q, order]);
+  const month = (r: SavedReport) => MONTH.format(new Date(r.createdAt));
 
   const scope = useMemo(() => (dataset ? scopeOf(dataset, filters) : null), [dataset, filters]);
   const preview = useMemo(() => (dataset ? summarize(dataset, filters) : null), [dataset, filters]);
@@ -586,14 +724,51 @@ function ReportLibrary() {
           title="저장한 보고서"
           description={reports.length ? `${reports.length}건 · 이 브라우저에 보관` : undefined}
         />
+        {reports.length > 1 && (
+          <div className="mt-3 flex flex-col gap-2 px-5 sm:flex-row md:px-6">
+            <div className="relative min-w-0 flex-1">
+              <label htmlFor="report-search" className="sr-only">
+                보고서 찾기
+              </label>
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-dim" aria-hidden />
+              <input
+                id="report-search"
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="제목·데이터·결론으로 찾기"
+                className={`${field} w-full pl-10`}
+              />
+            </div>
+            <Select
+              label="정렬"
+              value={order}
+              onChange={(v) => setOrder(v as typeof order)}
+              options={[
+                { value: "recent", label: "최근 저장 순" },
+                { value: "risk", label: "위험 많은 순" },
+                { value: "period", label: "분석 기간 순" },
+              ]}
+              className="sm:w-[168px]"
+            />
+          </div>
+        )}
         {reports.length === 0 ? (
           <p className="px-5 pb-8 pt-6 text-center text-sub text-ink-dim md:px-6">
             아직 저장한 보고서가 없습니다. 위에서 첫 보고서를 만들어보세요.
           </p>
+        ) : shown.length === 0 ? (
+          <p className="px-5 pb-8 pt-6 text-center text-sub text-ink-dim md:px-6" role="status">
+            ‘{q.trim()}’에 맞는 보고서가 없습니다.
+          </p>
         ) : (
           <ul className="mt-2 divide-y divide-line">
-            {reports.map((r) => (
+            {shown.map((r, i) => (
               <li key={r.id}>
+                {/* 최근 저장 순일 때는 저장한 달로 묶는다 */}
+                {order === "recent" && (i === 0 || month(shown[i - 1]) !== month(r)) && (
+                  <p className="bg-surface-soft px-5 py-1.5 text-caption font-semibold text-ink-dim md:px-6">{month(r)}</p>
+                )}
                 <Link href={`/reports?id=${r.id}`} className="group flex gap-4 px-5 py-5 transition-colors hover:bg-surface-soft md:px-6">
                   <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-soft text-brand" aria-hidden>
                     <FileText className="h-5 w-5" />
@@ -614,12 +789,13 @@ function ReportLibrary() {
                       <span className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-negative-soft px-2.5 py-0.5 text-caption font-semibold text-negative">
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-negative" aria-hidden />
                         <span className="truncate">
-                          위험 요소 {r.findings.filter((f) => f.impact === "negative").length + r.anomalies.length}건
+                          위험 요소 {riskCount(r)}건
                           {r.brief?.risk ? ` · ${r.brief.risk.title}` : ""}
                         </span>
                       </span>
                     )}
                   </span>
+                  <ArrowRight className="mt-3 hidden h-4 w-4 shrink-0 text-ink-dim transition-transform group-hover:translate-x-0.5 group-hover:text-brand sm:block" aria-hidden />
                 </Link>
               </li>
             ))}

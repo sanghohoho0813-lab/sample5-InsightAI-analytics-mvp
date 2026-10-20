@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, ChevronRight, LoaderCircle, Search } from "lucide-react";
+import { ArrowRight, Check, ChevronRight, Copy, CornerDownRight, LoaderCircle, Search } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import EmptyState from "@/components/EmptyState";
@@ -10,7 +10,7 @@ import { useApp } from "@/lib/store";
 import { useDrill } from "@/lib/drill";
 import { askDataQuestion, Answer } from "@/lib/ai/client";
 import { QUESTION_MAX } from "@/lib/ai/contract";
-import { suggestedQuestions } from "@/lib/qa";
+import { Suggestion, suggestedQuestions } from "@/lib/qa";
 import { btn, field } from "@/lib/ui";
 
 interface Entry extends Answer {
@@ -21,15 +21,40 @@ interface Entry extends Answer {
 const isEntry = (x: unknown): x is Entry =>
   !!x && typeof x === "object" && typeof (x as Entry).question === "string" && typeof (x as Entry).text === "string" && Array.isArray((x as Entry).evidence);
 
-function AnswerCard({ e }: { e: Entry }) {
+function AnswerCard({ e, latest, followUps, onAsk }: { e: Entry; latest: boolean; followUps: Suggestion[]; onAsk: (q: string) => void }) {
   const { follow } = useDrill();
+  const { showToast } = useApp();
+  const [copied, setCopied] = useState(false);
+
+  // 답을 메신저·메일에 붙여 넣을 수 있게 — 질문 · 답 · 근거를 한 덩어리로
+  const copy = async () => {
+    const text = [`Q. ${e.question}`, `A. ${e.text}`, ...(e.evidence.length ? ["근거", ...e.evidence.map((x) => `- ${x}`)] : []), `(${e.scope})`].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      showToast("이 브라우저에서는 복사할 수 없습니다. 답을 직접 선택해 복사해주세요.", "error");
+    }
+  };
+
   return (
-    <article className="card p-5 md:p-6" aria-label={`질문: ${e.question}`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="text-lead font-bold text-ink">{e.question}</h2>
-        <p className="text-caption text-ink-dim">
-          {e.scope} · {e.source === "llm" ? "AI가 쓴 문장(근거는 같은 계산)" : "규칙 기반 계산"}
-        </p>
+    <article className={`card p-5 md:p-6 ${latest ? "animate-fade-up" : ""}`} aria-label={`질문: ${e.question}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lead font-bold text-ink">{e.question}</h2>
+          <p className="mt-0.5 text-caption text-ink-dim">
+            {e.scope} · {e.source === "llm" ? "AI가 쓴 문장(근거는 같은 계산)" : "규칙 기반 계산"}
+          </p>
+        </div>
+        <button
+          onClick={copy}
+          className="-mr-2 -mt-1 inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-control px-2 text-meta font-semibold text-ink-dim transition-colors hover:bg-surface-soft hover:text-ink"
+          aria-label={copied ? "복사했습니다" : `답 복사: ${e.question}`}
+        >
+          {copied ? <Check className="h-4 w-4 text-positive" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
+          <span className="hidden sm:inline">{copied ? "복사했어요" : "복사"}</span>
+        </button>
       </div>
       <p className="mt-3 text-body text-ink">{e.text}</p>
       {e.evidence.length > 0 && (
@@ -53,6 +78,25 @@ function AnswerCard({ e }: { e: Entry }) {
           ))}
         </div>
       )}
+      {/* 가장 최근 답에만 — 아직 묻지 않은, 이 데이터로 답할 수 있는 다음 질문 */}
+      {latest && followUps.length > 0 && (
+        <div className="mt-4 border-t border-line pt-4">
+          <h3 className="text-caption font-semibold text-ink-dim">이어서 물어보기</h3>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {followUps.map((f) => (
+              <li key={f.question}>
+                <button
+                  onClick={() => onAsk(f.question)}
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-brand-soft px-3.5 text-sub font-semibold text-brand transition-colors hover:bg-brand hover:text-white"
+                >
+                  <CornerDownRight className="h-3.5 w-3.5" aria-hidden />
+                  {f.question}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </article>
   );
 }
@@ -62,11 +106,12 @@ function AnswerCard({ e }: { e: Entry }) {
  * 질문은 화면과 같은 범위·계산으로 답하고, 답마다 근거와 이어서 볼 화면을 붙인다.
  */
 export default function AiQueryPage() {
-  const { ready, dataset, filters } = useApp();
+  const { ready, dataset, filters, showToast } = useApp();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   // 질문 기록은 데이터셋별로 이 탭이 열려 있는 동안 유지한다(다른 화면에 다녀와도 남게).
   const key = dataset ? `insightai.qa.${dataset.id}` : null;
@@ -89,6 +134,19 @@ export default function AiQueryPage() {
   }, [key, entries]);
 
   const suggestions = useMemo(() => (dataset ? suggestedQuestions(dataset, filters) : []), [dataset, filters]);
+  const asked = useMemo(() => new Set(entries.map((e) => e.question)), [entries]);
+
+  // '/'를 누르면 어디서든 질문 칸으로(입력 중일 때는 그대로 글자 입력)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey || (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      inputRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   if (!ready) return <PageSkeleton />;
   if (!dataset) {
@@ -105,6 +163,10 @@ export default function AiQueryPage() {
     if (!q || pending) return;
     setInput("");
     setPending(q);
+    // 답이 쌓이는 자리로 — 좁은 화면에서 추천 질문 아래로 답이 숨어 버리지 않게
+    requestAnimationFrame(() =>
+      resultsRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" })
+    );
     const answer = await askDataQuestion(q, dataset, filters);
     setEntries((list) => [{ ...answer, id: `${Date.now()}`, question: q }, ...list]);
     setPending(null);
@@ -117,7 +179,15 @@ export default function AiQueryPage() {
         description={`${dataset.name}에 대해 묻고, 화면과 같은 계산으로 답을 받습니다`}
         actions={
           entries.length > 0 ? (
-            <button onClick={() => setEntries([])} disabled={!!pending} className={btn.secondary}>
+            <button
+              onClick={() => {
+                const before = entries;
+                setEntries([]);
+                showToast("질문 기록을 지웠습니다.", "info", { label: "되돌리기", onClick: () => setEntries(before) });
+              }}
+              disabled={!!pending}
+              className={btn.secondary}
+            >
               기록 지우기
             </button>
           ) : undefined
@@ -149,8 +219,14 @@ export default function AiQueryPage() {
               placeholder={suggestions[0] ? `예: ${suggestions[0].question}` : "예: 매출이 왜 늘었어?"}
               maxLength={QUESTION_MAX}
               autoComplete="off"
-              className={`${field} h-12 w-full pl-11 text-body`}
+              className={`${field} h-12 w-full pl-11 text-body sm:pr-12`}
             />
+            <kbd
+              className="pointer-events-none absolute right-3 top-1/2 hidden h-6 min-w-6 -translate-y-1/2 items-center justify-center rounded-[6px] border border-line-strong bg-surface-soft px-1.5 text-caption font-semibold text-ink-dim sm:flex"
+              aria-hidden
+            >
+              /
+            </kbd>
           </div>
           <button type="submit" disabled={!input.trim() || !!pending} className={`${btn.primary} h-12`}>
             질문하기
@@ -166,8 +242,11 @@ export default function AiQueryPage() {
                 <button
                   onClick={() => ask(s.question)}
                   disabled={!!pending}
-                  className="flex w-full items-center gap-3 rounded-control border border-line-strong bg-surface px-4 py-3 text-left text-sub text-ink transition-colors hover:border-brand hover:text-brand disabled:opacity-50 sm:min-h-11 sm:w-auto sm:rounded-full sm:py-0"
+                  className={`flex w-full items-center gap-3 rounded-control border px-4 py-3 text-left text-sub transition-colors hover:border-brand hover:text-brand disabled:opacity-50 sm:min-h-11 sm:w-auto sm:rounded-full sm:py-0 ${
+                    asked.has(s.question) ? "border-line bg-surface-soft text-ink-soft" : "border-line-strong bg-surface text-ink"
+                  }`}
                 >
+                  {asked.has(s.question) && <Check className="h-4 w-4 shrink-0 text-positive" aria-label="물어본 질문" />}
                   <span className="min-w-0 flex-1">
                     {s.question}
                     <span className="mt-0.5 block text-caption text-ink-dim sm:ml-2 sm:mt-0 sm:inline">{s.hint}</span>
@@ -184,7 +263,7 @@ export default function AiQueryPage() {
         </p>
       </section>
 
-      <div className="mt-6 space-y-4" aria-live="polite">
+      <div ref={resultsRef} className="mt-6 scroll-mt-20 space-y-4 lg:scroll-mt-24" aria-live="polite">
         {pending && (
           <div className="card flex items-center gap-3 p-5 md:p-6" role="status">
             <LoaderCircle className="h-5 w-5 animate-spin text-brand" aria-hidden />
@@ -193,8 +272,14 @@ export default function AiQueryPage() {
             </p>
           </div>
         )}
-        {entries.map((e) => (
-          <AnswerCard key={e.id} e={e} />
+        {entries.map((e, i) => (
+          <AnswerCard
+            key={e.id}
+            e={e}
+            latest={i === 0 && !pending}
+            followUps={suggestions.filter((x) => !asked.has(x.question)).slice(0, 3)}
+            onAsk={ask}
+          />
         ))}
         {!pending && entries.length === 0 && (
           <p className="rounded-card border border-dashed border-line-strong px-5 py-8 text-center text-sub text-ink-dim">

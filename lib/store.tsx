@@ -52,13 +52,16 @@ interface AppState {
   reports: SavedReport[];
   toasts: ToastMsg[];
   readIds: string[];
+  /** 완료로 표시한 할 일 — 키(데이터셋::제목) → 표시한 시각 */
+  doneActions: Record<string, string>;
   setFilters: (f: Partial<Filters>) => void;
   setPreset: (preset: "7" | "30" | "90") => void;
   setCustomRange: (start: string, end: string) => void;
   resetFilters: () => void;
   startAnalysis: (dataset: DemoDataset, navigateTo?: string) => void;
   openAnalysis: (record: AnalysisRecord) => void;
-  saveReport: (title?: string) => SavedReport | null;
+  /** 지금 범위로 저장 — at을 주면 그 데이터·범위로 저장한다(예: 이전 기간 보고서) */
+  saveReport: (title?: string, at?: { dataset: DemoDataset; filters: Filters }) => SavedReport | null;
   deleteReport: (id: string) => void;
   renameReport: (id: string, title: string) => void;
   drill: Drill | null;
@@ -74,7 +77,11 @@ interface AppState {
   showToast: (message: string, type?: ToastMsg["type"], action?: ToastMsg["action"]) => void;
   dismissToast: (id: number) => void;
   markRead: (ids: string[]) => void;
+  toggleAction: (key: string) => void;
 }
+
+/** 할 일 완료 표시의 키 — 같은 제안 id라도 범위마다 내용이 달라 제목까지 묶는다 */
+export const actionKey = (datasetId: string, title: string) => `${datasetId}::${title}`;
 
 const Ctx = createContext<AppState | null>(null);
 
@@ -109,6 +116,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [readIds, setReadIds] = useState<string[]>([]);
+  const [doneActions, setDoneActions] = useState<Record<string, string>>({});
   const [uploads, setUploads] = useState<DemoDataset[]>([]);
   const [drill, setDrill] = useState<Drill | null>(null);
   const lastSave = useRef<{ sig: string; at: number } | null>(null);
@@ -120,6 +128,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHistory(readList<AnalysisRecord>(KEYS.history, isValidRecord));
     setReports(readList<SavedReport>(KEYS.reports, isValidReport));
     setReadIds(readList<string>(KEYS.read, (x) => typeof x === "string"));
+    const done = readJson<unknown>(KEYS.done, {});
+    setDoneActions(
+      done && typeof done === "object" && !Array.isArray(done)
+        ? Object.fromEntries(Object.entries(done as Record<string, unknown>).filter(([, v]) => typeof v === "string")) as Record<string, string>
+        : {}
+    );
     setUploads(readUploads());
     const active = readJson<{ id?: string } | null>(KEYS.active, null);
     const restored = active?.id ? findDataset(active.id) : null;
@@ -166,6 +180,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const next = Array.from(new Set([...prev, ...ids])).slice(-300);
       writeJson(KEYS.read, next);
       return next;
+    });
+  }, []);
+
+  const toggleAction = useCallback((key: string) => {
+    setDoneActions((prev) => {
+      const next = { ...prev };
+      if (next[key]) delete next[key];
+      else next[key] = new Date().toISOString();
+      // 오래된 표시는 정리한다(최근 200개)
+      const kept = Object.fromEntries(Object.entries(next).sort((a, b) => b[1].localeCompare(a[1])).slice(0, 200));
+      writeJson(KEYS.done, kept);
+      return kept;
     });
   }, []);
 
@@ -241,9 +267,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const saveReport = useCallback(
-    (title?: string) => {
-      if (!dataset) return null;
-      const report = buildReport(dataset, filters, title);
+    (title?: string, at?: { dataset: DemoDataset; filters: Filters }) => {
+      const ds = at?.dataset ?? dataset;
+      if (!ds) return null;
+      const report = buildReport(ds, at?.filters ?? filters, title);
       // 연속 클릭으로 같은 보고서가 두 번 저장되지 않게 막는다.
       if (lastSave.current && lastSave.current.sig === report.signature && Date.now() - lastSave.current.at < 1500) return null;
       lastSave.current = { sig: report.signature, at: Date.now() };
@@ -333,6 +360,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHistory([]);
     setReports([]);
     setReadIds([]);
+    setDoneActions({});
     setUploads([]);
     activate(getDemoDatasets()[0]);
     router.push("/dashboard");
@@ -351,6 +379,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reports,
       toasts,
       readIds,
+      doneActions,
       setFilters,
       setPreset,
       setCustomRange,
@@ -370,8 +399,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       showToast,
       dismissToast,
       markRead,
+      toggleAction,
     }),
-    [ready, dataset, analyzing, analysisStep, filters, settings, history, reports, toasts, readIds,
+    [ready, dataset, analyzing, analysisStep, filters, settings, history, reports, toasts, readIds, doneActions, toggleAction,
      setFilters, setPreset, setCustomRange, resetFilters, startAnalysis, openAnalysis, saveReport,
      deleteReport, renameReport, drill, beginDrill, endDrill, updateSettings, resetDemo, uploads, switchDataset, showToast, dismissToast, markRead]
   );

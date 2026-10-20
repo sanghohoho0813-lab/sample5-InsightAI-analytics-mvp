@@ -23,6 +23,14 @@ const FLOWS: { name: string; path: string; enter?: (page: Page) => Promise<void>
       await expect(page.getByRole("heading", { name: "6. 생성 시점" })).toBeVisible();
     },
   },
+  {
+    name: "빠른 이동 (열린 상태)",
+    path: "/dashboard",
+    enter: async (page) => {
+      await page.getByRole("button", { name: /빠른 이동/ }).click();
+      await expect(page.getByRole("dialog", { name: "빠른 이동" })).toBeVisible();
+    },
+  },
 ];
 
 for (const { name, path, enter } of FLOWS) {

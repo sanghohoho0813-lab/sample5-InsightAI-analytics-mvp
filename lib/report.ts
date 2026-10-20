@@ -110,3 +110,70 @@ export function keyFinding(dataset: DemoDataset, filters: Filters) {
     alertCount: s.anomalies.filter((a) => a.severity !== "info").length,
   };
 }
+
+/**
+ * 비교할 앞선 보고서 — 같은 데이터·같은 대상(채널·상품)으로, 이 보고서보다 앞서 끝나는 기간을 다룬 것 중 가장 가까운 것.
+ * (같은 기간을 다시 저장한 보고서나 대상이 다른 보고서와는 비교하지 않는다)
+ */
+export function previousReport(report: SavedReport, all: SavedReport[]): SavedReport | null {
+  return (
+    all
+      .filter(
+        (r) =>
+          r.id !== report.id &&
+          r.datasetId === report.datasetId &&
+          r.scope.channel === report.scope.channel &&
+          r.scope.product === report.scope.product &&
+          r.scope.end < report.scope.end
+      )
+      .sort((a, b) => b.scope.end.localeCompare(a.scope.end) || b.createdAt.localeCompare(a.createdAt))[0] ?? null
+  );
+}
+
+export interface ReportComparison {
+  /** 기간 길이가 달라 합계 지표를 하루 평균으로 맞췄는지 */
+  perDay: boolean;
+  kpis: { key: string; label: string; format: SavedReport["kpis"][number]["format"]; before: number; after: number; change: number; unit: "%" | "%p" }[];
+  /** 앞 보고서에 있던 위험 중 이번에는 없는 것 / 새로 생긴 것 */
+  resolved: string[];
+  added: string[];
+}
+
+const ADDITIVE = new Set(["revenue", "orders", "customers"]);
+const riskTitles = (r: SavedReport) =>
+  Array.from(new Set([...r.findings.filter((f) => f.impact === "negative").map((f) => f.title), ...r.anomalies.map((a) => a.title)]));
+
+/** 두 보고서의 결론 비교 — 지표는 같은 지표끼리, 위험은 제목으로 맞춘다. */
+export function compareReports(before: SavedReport, after: SavedReport): ReportComparison {
+  const perDay = before.scope.days !== after.scope.days;
+  const kpis = after.kpis
+    .map((k) => {
+      const b = before.kpis.find((x) => x.key === k.key);
+      if (!b) return null;
+      const scale = (v: number, days: number) => (perDay && ADDITIVE.has(k.key) ? v / Math.max(1, days) : v);
+      const x = scale(b.value, before.scope.days);
+      const y = scale(k.value, after.scope.days);
+      const rate = k.format === "percent";
+      return {
+        key: k.key,
+        label: perDay && ADDITIVE.has(k.key) ? `${k.label}(하루 평균)` : k.label,
+        format: k.format,
+        before: x,
+        after: y,
+        change: rate ? +(y - x).toFixed(2) : x > 0 ? +(((y - x) / x) * 100).toFixed(1) : 0,
+        unit: rate ? ("%p" as const) : ("%" as const),
+      };
+    })
+    .filter((k): k is NonNullable<typeof k> => k != null);
+  const was = riskTitles(before);
+  const now = riskTitles(after);
+  return { perDay, kpis, resolved: was.filter((t) => !now.includes(t)), added: now.filter((t) => !was.includes(t)) };
+}
+
+/** 이 보고서 바로 앞의 같은 길이 기간 — 데이터가 그만큼 거슬러 올라가지 않으면 null */
+export function previousScope(report: SavedReport, dataStart: string): { start: string; end: string } | null {
+  const day = 86_400_000;
+  const end = new Date(Date.parse(`${report.scope.start}T00:00:00Z`) - day).toISOString().slice(0, 10);
+  const start = new Date(Date.parse(`${end}T00:00:00Z`) - (report.scope.days - 1) * day).toISOString().slice(0, 10);
+  return start >= dataStart ? { start, end } : null;
+}

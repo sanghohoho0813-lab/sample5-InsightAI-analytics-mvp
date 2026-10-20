@@ -8,11 +8,12 @@ import PageSkeleton from "@/components/PageSkeleton";
 import FilterToolbar from "@/components/FilterToolbar";
 import EmptyState from "@/components/EmptyState";
 import AnomalyList from "@/components/AnomalyList";
+import AnomalyStrip from "@/components/AnomalyStrip";
 import InvestigationView from "@/components/InvestigationView";
 import { Panel } from "@/components/Panel";
 import { useApp } from "@/lib/store";
-import { ANOMALY_MIN_DAYS } from "@/lib/anomaly-engine";
-import { uniqueDates } from "@/lib/analytics-engine";
+import { ANOMALY_MIN_DAYS, anomalyTrace } from "@/lib/anomaly-engine";
+import { trendSeries, uniqueDates } from "@/lib/analytics-engine";
 import { anomaliesFor } from "@/lib/dataset-meta";
 import { recentAlerts } from "@/lib/notifications";
 import { DemoDataset, Filters, Severity } from "@/lib/types";
@@ -78,6 +79,12 @@ function AnomalyLibrary() {
   const [tab, setTab] = useState<Tab>("all");
 
   const anomalies = useMemo(() => (dataset ? anomaliesFor(dataset, filters) : []), [dataset, filters]);
+  // 기간 한눈에(일별 매출) · 행마다 변화 전후 추이
+  const days = useMemo(() => (dataset ? trendSeries(dataset.rows, filters).map((p) => ({ date: p.date, revenue: p.revenue })) : []), [dataset, filters]);
+  const traces = useMemo(
+    () => new Map(dataset ? anomalies.map((a) => [a.id, anomalyTrace(dataset.rows, filters.product, a)] as const) : []),
+    [dataset, anomalies, filters.product]
+  );
   const read = useMemo(() => new Set(readIds), [readIds]);
   // '새로움'은 확인이 필요한 등급(위험·주의)에만 단다.
   const unreadIds = useMemo(
@@ -131,6 +138,7 @@ function AnomalyLibrary() {
       <FilterToolbar dataset={dataset} />
 
       <Panel>
+        {anomalies.length > 0 && <AnomalyStrip days={days} anomalies={anomalies} />}
         <div className="flex gap-1 overflow-x-auto border-b border-line px-3 md:px-4" role="tablist" aria-label="등급">
           {tabs.map((t) => (
             <button
@@ -151,6 +159,7 @@ function AnomalyLibrary() {
           anomalies={shown}
           unreadIds={unreadIds}
           onRead={(id) => markRead([id])}
+          traces={traces}
           empty="이 등급에 해당하는 변화가 없습니다."
         />
       </Panel>

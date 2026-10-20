@@ -4,6 +4,7 @@ import TopBar from "@/components/TopBar";
 import AppFooter from "@/components/AppFooter";
 import DrillWatcher from "@/components/DrillWatcher";
 import RouteFocus from "@/components/RouteFocus";
+import CommandPalette from "@/components/CommandPalette";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -24,6 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <MobileNav />
       <DrillWatcher />
       <RouteFocus />
+      <CommandPalette />
     </div>
   );
 }

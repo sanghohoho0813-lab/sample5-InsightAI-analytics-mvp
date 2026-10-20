@@ -130,6 +130,26 @@ export function scopeSeries(rows: DataRow[], product: string, scope: string, end
   );
 }
 
+export interface AnomalyTrace {
+  /** 시작 7일 전부터 끝난 뒤 3일까지(데이터 안에서) 그 범위·지표의 일별 값 */
+  values: number[];
+  /** values 안에서 변화 구간(시작·끝) 위치 */
+  from: number;
+  to: number;
+}
+
+/** 목록 한 줄에 붙일 작은 추이 — 그 변화가 평소 흐름에서 얼마나 튀었는지를 보여준다. */
+export function anomalyTrace(rows: DataRow[], product: string, a: Anomaly): AnomalyTrace | null {
+  const key = (a.metrics[0]?.key ?? "revenue") as MetricId;
+  const series = scopeSeries(rows, product, a.channel ?? "전체");
+  const start = series.findIndex((p) => p.date === a.date);
+  const end = series.findIndex((p) => p.date === a.endDate);
+  if (start < 0 || end < start) return null;
+  const lo = Math.max(0, start - 7);
+  const hi = Math.min(series.length - 1, end + 3);
+  return { values: series.slice(lo, hi + 1).map((p) => p[key] as number), from: start - lo, to: end - lo };
+}
+
 /**
  * 이상치 탐지 (규칙 기반):
  * - 지표별로 '평소 수준'(최근 7일 중앙값, 같은 요일 중앙값)에서 20% 이상(전환율·객단가는 15%) 벗어난 날을 찾는다.

@@ -7,6 +7,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import EmptyState from "@/components/EmptyState";
 import { Panel } from "@/components/Panel";
 import ForecastChart from "@/components/charts/ForecastChart";
+import ForecastCheck from "@/components/ForecastCheck";
 import { useApp } from "@/lib/store";
 import { FORECAST_MIN_DAYS } from "@/lib/forecast-engine";
 import { forecastsFor } from "@/lib/dataset-meta";
@@ -114,6 +115,8 @@ export default function ForecastPage() {
           <ForecastChart summary={current} height={300} />
         </div>
       </Panel>
+
+      <ForecastCheck key={current.key} summary={current} fmt={fmt} />
 
       <p className="mt-4 text-meta text-ink-dim">
         단순 추세 모델의 추정치입니다. 프로모션·시즌 요인은 반영하지 않으며, 예상 범위는 최근 변동폭으로 계산합니다.
