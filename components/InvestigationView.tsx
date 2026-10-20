@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
 import InvestigationChart from "./charts/InvestigationChart";
 import { Panel } from "./Panel";
 import { whenText } from "./AnomalyList";
 import { useApp } from "@/lib/store";
-import { useDrill } from "@/lib/drill";
+import { investigationHref, useDrill } from "@/lib/drill";
 import { investigate, Investigation } from "@/lib/investigate";
-import { formatMonthDay } from "@/lib/format";
+import { formatMonthDay, josa } from "@/lib/format";
 import { ALL_NAV } from "@/lib/nav";
 import { Anomaly } from "@/lib/types";
 import { SEVERITY_META, btn } from "@/lib/ui";
@@ -45,32 +46,78 @@ function Status({ inv }: { inv: Investigation }) {
 }
 
 /** 이상치 조사 — 무슨 변화인가 → 언제부터 → 어디서 → 근거 → 지금 할 일 */
-export default function InvestigationView({ anomaly, from }: { anomaly: Anomaly; from: string | null }) {
-  const { dataset, filters, markRead } = useApp();
+export default function InvestigationView({ anomaly, queue, from }: { anomaly: Anomaly; queue: Anomaly[]; from: string | null }) {
+  const { dataset, filters, markRead, readIds } = useApp();
   const { toMoment } = useDrill();
+  const router = useRouter();
   const inv = useMemo(() => (dataset ? investigate(dataset, anomaly, filters) : null), [dataset, anomaly, filters]);
   const s = SEVERITY_META[anomaly.severity];
   const back = from ? (ALL_NAV.find((n) => n.href === from)?.label ?? "이전 화면") : "이상 감지 목록";
+
+  // 넘겨보기 — 목록과 같은 순서로 이전·다음 변화로 간다(받은편지함처럼 차례로 확인).
+  const index = Math.max(0, queue.findIndex((a) => a.id === anomaly.id));
+  const prev = index > 0 ? queue[index - 1] : null;
+  const next = index < queue.length - 1 ? queue[index + 1] : null;
+  const unreadLeft = queue.filter((a) => a.severity !== "info" && a.id !== anomaly.id && !readIds.includes(a.id)).length;
+  const go = useCallback(
+    (a: Anomaly) => {
+      router.replace(investigationHref(a.id, from ?? undefined));
+      window.scrollTo({ top: 0 });
+    },
+    [router, from]
+  );
 
   // 조사 화면을 열었으면 확인한 것으로 본다.
   useEffect(() => {
     if (anomaly.severity !== "info") markRead([anomaly.id]);
   }, [anomaly.id, anomaly.severity, markRead]);
 
+  // ← → 키로 넘기기(입력 중이 아닐 때)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (e.key === "ArrowLeft" && prev) go(prev);
+      if (e.key === "ArrowRight" && next) go(next);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [prev, next, go]);
+
   const backLink = (
-    <Link
-      href={from ?? "/anomalies"}
-      className="mb-4 inline-flex min-h-11 items-center gap-1 text-sub font-semibold text-ink-soft hover:text-ink"
-    >
-      <ArrowLeft className="h-4 w-4" aria-hidden /> {back}
-      {from ? "로 돌아가기" : ""}
+    <Link href={from ?? "/anomalies"} className="inline-flex min-h-11 min-w-0 items-center gap-1 text-sub font-semibold text-ink-soft hover:text-ink">
+      <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden /> <span className="truncate">{from ? `${josa(back, "으로")} 돌아가기` : back}</span>
     </Link>
+  );
+
+  const stepper = "flex h-9 w-9 items-center justify-center rounded-control border border-line-strong bg-surface text-ink-soft shadow-subtle transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-40";
+  const triageBar = (
+    <nav
+      aria-label="변화 넘겨보기"
+      className="sticky top-14 z-20 -mx-4 mb-5 flex items-center gap-2 border-b border-line/70 bg-canvas/90 px-4 py-1.5 backdrop-blur-md md:-mx-8 md:px-8 lg:top-[60px]"
+    >
+      {backLink}
+      {queue.length > 1 && (
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <span className="tabular text-meta text-ink-dim" aria-live="polite">
+            <b className="font-semibold text-ink">{index + 1}</b> / {queue.length}
+            {unreadLeft > 0 && <span className="hidden sm:inline"> · 미확인 {unreadLeft}건</span>}
+          </span>
+          <button onClick={() => prev && go(prev)} disabled={!prev} className={stepper} aria-label="이전 변화" title="이전 변화 (←)">
+            <ChevronLeft className="h-4 w-4" aria-hidden />
+          </button>
+          <button onClick={() => next && go(next)} disabled={!next} className={stepper} aria-label="다음 변화" title="다음 변화 (→)">
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+      )}
+    </nav>
   );
 
   if (!inv) {
     return (
       <>
-        {backLink}
+        {triageBar}
         <h1 className="text-page font-bold tracking-tight text-ink">{anomaly.title}</h1>
         <p className="mt-2 text-body text-ink-soft">{anomaly.description}</p>
         <p className="mt-4 text-sub text-ink-dim">이 변화 앞의 데이터가 7일보다 짧아 자세한 조사는 계산하지 않았습니다.</p>
@@ -80,7 +127,8 @@ export default function InvestigationView({ anomaly, from }: { anomaly: Anomaly;
 
   return (
     <>
-      {backLink}
+      {triageBar}
+      <div key={anomaly.id} className="animate-fade-in">
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-dim">
@@ -243,6 +291,37 @@ export default function InvestigationView({ anomaly, from }: { anomaly: Anomaly;
             다음 달과 비교할 수 있습니다.
           </p>
         </Step>
+      </div>
+
+      {/* 다음 변화로 — 확인을 마치면 목록으로 돌아가지 않고 바로 이어서 본다 */}
+      <div className="mt-6 flex flex-col gap-3 rounded-card border border-line bg-surface p-5 shadow-subtle sm:flex-row sm:items-center sm:justify-between md:px-6">
+        {next ? (
+          <>
+            <div className="min-w-0">
+              <p className="eyebrow">다음 변화 · {index + 2} / {queue.length}</p>
+              <p className="mt-0.5 truncate text-body font-semibold text-ink">
+                <span className={SEVERITY_META[next.severity].text}>[{SEVERITY_META[next.severity].label}]</span> {next.title}
+              </p>
+              <p className="text-meta text-ink-dim">{whenText(next)}</p>
+            </div>
+            <button onClick={() => go(next)} className={`${btn.primary} shrink-0`}>
+              확인했어요 · 다음 보기 <ArrowRight className="h-4 w-4" aria-hidden />
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="min-w-0">
+              <p className="eyebrow">마지막 변화</p>
+              <p className="mt-0.5 text-body font-semibold text-ink">
+                {queue.length > 1 ? `이 범위의 변화 ${queue.length}건을 모두 봤습니다.` : "이 범위에서 감지된 변화는 이것 하나입니다."}
+              </p>
+            </div>
+            <Link href={from ?? "/anomalies"} className={`${btn.secondary} shrink-0`}>
+              확인 완료 · {josa(back, "으로")}
+            </Link>
+          </>
+        )}
+      </div>
       </div>
     </>
   );

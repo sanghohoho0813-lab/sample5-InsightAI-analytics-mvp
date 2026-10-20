@@ -196,6 +196,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   outline-offset: 2px;
   border-radius: 8px;
 }
+/* 스크립트가 초점만 옮겨 두는 영역(본문 시작 · 보고서 절 제목 · 시트)은 링을 그리지 않는다 */
+[tabindex="-1"]:focus-visible { outline: none; }
+
+/* 키보드 사용자를 위한 '본문으로 건너뛰기' — 초점을 받을 때만 보인다 */
+.skip-link {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  z-index: 200;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--color-ink);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  transform: translateY(-160%);
+  transition: transform 0.15s ease-out;
+}
+.skip-link:focus { transform: none; }
 
 /* 모션 최소화 설정 존중 */
 @media (prefers-reduced-motion: reduce) {

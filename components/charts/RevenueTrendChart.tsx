@@ -5,6 +5,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -17,6 +18,7 @@ import { DailyPoint } from "@/lib/types";
 import ChartTooltip from "./ChartTooltip";
 import { COLORS } from "@/lib/palette";
 import { MetricKey } from "@/lib/types";
+import { useDrill } from "@/lib/drill";
 
 type Unit = "day" | "week" | "month";
 const UNITS: { value: Unit; label: string }[] = [
@@ -52,11 +54,19 @@ const METRIC_META: Record<
  * 지표 추이 차트 — 선택된 KPI를 따라가며, 현재 vs 이전 기간 비교,
  * 일/주/월 토글, 지점 클릭 상세를 제공한다.
  */
+export interface ChartMarker {
+  id: string;
+  date: string;
+  title: string;
+  down: boolean;
+}
+
 export default function RevenueTrendChart({
   points,
   metric = "revenue",
   markDate,
   header,
+  markers = [],
 }: {
   points: DailyPoint[];
   metric?: MetricKey;
@@ -64,9 +74,12 @@ export default function RevenueTrendChart({
   markDate?: string;
   /** 지표 탭처럼 제목 대신 둘 머리 영역 */
   header?: React.ReactNode;
+  /** 평소와 달랐던 날 — 선 위에 점으로 표시하고, 누르면 조사 화면으로 간다(일간 보기) */
+  markers?: ChartMarker[];
 }) {
   const [unit, setUnit] = useState<Unit>("day");
   const [selected, setSelected] = useState<DailyPoint | null>(null);
+  const { toInvestigation } = useDrill();
 
   const meta = METRIC_META[metric];
   const c = { base: COLORS.brand };
@@ -79,6 +92,20 @@ export default function RevenueTrendChart({
   useEffect(() => setSelected(null), [metric]);
 
   const labelFor = (d: string) => (unit === "month" ? d.replace("-", ".") : formatDateShort(d));
+
+  // 같은 날 여러 건이면 하락을 우선해 한 점만 찍는다.
+  const shownMarkers = useMemo(() => {
+    if (unit !== "day") return new Map<string, ChartMarker>();
+    const dates = new Set(data.map((p) => p.date));
+    const map = new Map<string, ChartMarker>();
+    for (const m of markers) {
+      if (!dates.has(m.date)) continue;
+      const prev = map.get(m.date);
+      if (!prev || (m.down && !prev.down)) map.set(m.date, m);
+    }
+    return map;
+  }, [markers, data, unit]);
+  const selectedMarker = selected && unit === "day" ? shownMarkers.get(selected.date) : undefined;
 
   // 차트 아래 한 줄 요약 — 좁은 화면에서도 촘촘한 선을 읽지 않고 핵심 숫자를 알 수 있게
   const stats = useMemo(() => {
@@ -109,6 +136,16 @@ export default function RevenueTrendChart({
                   style={{ backgroundImage: `repeating-linear-gradient(90deg,${COLORS.compare} 0 4px,transparent 4px 7px)` }}
                 />
                 이전 기간
+              </span>
+            )}
+            {shownMarkers.size > 0 && (
+              <span className="flex items-center gap-1.5">
+                {/* 떨어진 날은 빨강, 오른 날은 초록 — 차트 위 점과 같은 색 */}
+                <span className="flex -space-x-1" aria-hidden>
+                  {[...shownMarkers.values()].some((m) => m.down) && <span className="h-2.5 w-2.5 rounded-full border-2 border-surface bg-negative" />}
+                  {[...shownMarkers.values()].some((m) => !m.down) && <span className="h-2.5 w-2.5 rounded-full border-2 border-surface bg-positive" />}
+                </span>
+                평소와 달랐던 날 · 점을 누르면 조사
               </span>
             )}
           </div>
@@ -163,7 +200,15 @@ export default function RevenueTrendChart({
                 ];
                 if (hasPrev && p.prevRevenue != null)
                   rows.push({ name: "이전 기간", value: formatKRWExact(p.prevRevenue), color: COLORS.compare });
-                return <ChartTooltip label={unit === "month" ? String(label) : formatDateKR(String(label))} rows={rows} />;
+                const m = unit === "day" ? shownMarkers.get(p.date) : undefined;
+                return (
+                  <ChartTooltip
+                    label={unit === "month" ? String(label) : formatDateKR(String(label))}
+                    rows={rows}
+                    note={m ? `${m.down ? "▼" : "▲"} ${m.title} — 눌러서 조사` : undefined}
+                    noteTone={m && !m.down ? "positive" : "negative"}
+                  />
+                );
               }}
             />
             {markDate && unit === "day" && data.some((p) => p.date === markDate) && (
@@ -196,6 +241,29 @@ export default function RevenueTrendChart({
               activeDot={{ r: 5.5, fill: c.base, stroke: "#ffffff", strokeWidth: 2.5 }}
               animationDuration={700}
             />
+            {Array.from(shownMarkers.values()).map((m) => {
+              const p = data.find((d) => d.date === m.date)!;
+              return (
+                <ReferenceDot
+                  key={m.id}
+                  x={m.date}
+                  y={p[meta.key] as number}
+                  ifOverflow="extendDomain"
+                  shape={(props: { cx?: number; cy?: number }) => (
+                    <g
+                      className="cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toInvestigation(m.id);
+                      }}
+                    >
+                      <circle cx={props.cx} cy={props.cy} r={11} fill={m.down ? COLORS.negative : COLORS.positive} opacity={0.14} />
+                      <circle cx={props.cx} cy={props.cy} r={5.5} fill={m.down ? COLORS.negative : COLORS.positive} stroke="#ffffff" strokeWidth={2} />
+                    </g>
+                  )}
+                />
+              );
+            })}
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -229,6 +297,14 @@ export default function RevenueTrendChart({
           )}
           {hasPrev && selected.prevRevenue != null && (
             <span className="text-ink-soft">이전 기간 <b className="text-ink">{formatKRWExact(selected.prevRevenue)}</b></span>
+          )}
+          {selectedMarker && (
+            <button
+              onClick={() => toInvestigation(selectedMarker.id)}
+              className={`inline-flex min-h-9 items-center gap-1 font-semibold ${selectedMarker.down ? "text-negative" : "text-positive"} hover:underline`}
+            >
+              {selectedMarker.title} — 조사하기 →
+            </button>
           )}
           <button onClick={() => setSelected(null)} className="ml-auto min-h-9 font-semibold text-ink-soft hover:text-ink">
             닫기

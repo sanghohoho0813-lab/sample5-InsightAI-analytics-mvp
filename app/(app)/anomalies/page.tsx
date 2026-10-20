@@ -22,16 +22,20 @@ type Tab = "all" | Severity;
 
 /** 조사 화면에서 열 이상치 — 지금 범위에서 먼저 찾고, 없으면 전체 기간에서 찾는다(다른 범위에서 저장한 링크 대비). */
 function findAnomaly(ds: DemoDataset, filters: Filters, id: string) {
-  const inScope = anomaliesFor(ds, filters).find((a) => a.id === id);
-  if (inScope) return inScope;
+  // 넘겨보기 순서는 목록과 같은 순서(지금 범위의 이상치)를 쓴다.
+  const queue = anomaliesFor(ds, filters);
+  const inScope = queue.find((a) => a.id === id);
+  if (inScope) return { anomaly: inScope, queue };
   const dates = uniqueDates(ds.rows);
   const all: Filters = { ...filters, preset: "custom", rangeDays: dates.length, range: { start: dates[0], end: dates[dates.length - 1] } };
-  return anomaliesFor(ds, all).find((a) => a.id === id) ?? null;
+  const found = anomaliesFor(ds, all).find((a) => a.id === id) ?? null;
+  return found ? { anomaly: found, queue: [found] } : null;
 }
 
 function Investigation({ id, from }: { id: string; from: string | null }) {
   const { ready, dataset, filters } = useApp();
-  const anomaly = useMemo(() => (dataset ? findAnomaly(dataset, filters, id) : null), [dataset, filters, id]);
+  const hit = useMemo(() => (dataset ? findAnomaly(dataset, filters, id) : null), [dataset, filters, id]);
+  const anomaly = hit?.anomaly ?? null;
   if (!ready) return <PageSkeleton />;
   if (!dataset) {
     return (
@@ -51,7 +55,7 @@ function Investigation({ id, from }: { id: string; from: string | null }) {
       </>
     );
   }
-  return <InvestigationView anomaly={anomaly} from={from && from.startsWith("/") ? from : null} />;
+  return <InvestigationView anomaly={anomaly} queue={hit!.queue} from={from && from.startsWith("/") ? from : null} />;
 }
 
 function AnomaliesView() {

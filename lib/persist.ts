@@ -16,6 +16,7 @@ export const KEYS = {
   reports: `${PREFIX}reports`,
   settings: `${PREFIX}settings`,
   uploads: `${PREFIX}uploads`,
+  guide: `${PREFIX}guideSeen`,
 } as const;
 
 /** 업로드 원본은 용량이 커서 최근 몇 개만 보관한다. */

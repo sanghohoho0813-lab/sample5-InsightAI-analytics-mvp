@@ -146,6 +146,26 @@ describe("capabilities — 이 데이터로 할 수 있는 분석", () => {
     expect(fitPreset(200, "90")).toBe("90");
     expect(fitPreset(100, "90")).toBe("30");
   });
+
+  it("데이터 길이에 맞춰 고른 기본 기간은 '바뀐 범위'로 보지 않는다", async () => {
+    const { scopeChanged } = await import("@/lib/capabilities");
+    const all = { period: true, channel: true, product: true };
+    const f = (preset: "7" | "30" | "90" | "custom", channel = "all", product = "all") => ({
+      preset,
+      rangeDays: preset === "custom" ? 10 : Number(preset),
+      channel,
+      product,
+    });
+    // 45일치 업로드 → 기본 30일 대신 7일로 맞춘다. 그 상태는 초기화할 것이 없다.
+    expect(scopeChanged(f("7"), 45, "30", all)).toBe(false);
+    expect(scopeChanged(f("30"), 45, "30", all)).toBe(true);
+    expect(scopeChanged(f("30"), 90, "30", all)).toBe(false);
+    expect(scopeChanged(f("custom"), 90, "30", all)).toBe(true);
+    expect(scopeChanged(f("30", "자사몰"), 90, "30", all)).toBe(true);
+    // 화면에 없는 선택지(예: 기간을 숨긴 예측 화면)는 따지지 않는다.
+    expect(scopeChanged(f("7"), 90, "30", { ...all, period: false })).toBe(false);
+    expect(scopeChanged(f("30", "자사몰"), 90, "30", { ...all, channel: false })).toBe(false);
+  });
 });
 
 describe("sheetToTable (XLSX)", () => {

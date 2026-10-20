@@ -31,7 +31,7 @@ export function Evidence({ items, basis }: { items?: string[]; basis?: string })
         근거 {items.length}개 보기
         <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
       </summary>
-      <ul className="mt-1 space-y-1 border-l-2 border-line pl-3 text-meta text-ink-soft">
+      <ul className="animate-fade-in mt-1 space-y-1 border-l-2 border-line pl-3 text-meta text-ink-soft">
         {items.map((e) => (
           <li key={e} className="tabular">
             {e}

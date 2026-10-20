@@ -1,6 +1,6 @@
 import { ANOMALY_MIN_DAYS, WEEKLY_MIN_DAYS } from "./anomaly-engine";
 import { FORECAST_MIN_DAYS } from "./forecast-engine";
-import { DataRow, DerivedField, RangePreset } from "./types";
+import { DataRow, DerivedField, Filters, RangePreset } from "./types";
 
 /**
  * 이 데이터로 무엇을 분석할 수 있는지 — 업로드 진단과 데이터 화면이 같은 판단을 쓴다.
@@ -20,6 +20,23 @@ export function fitPreset(days: number, preferred: Exclude<RangePreset, "custom"
   if (days >= 60) return "30";
   if (days >= 14) return "7";
   return preferred;
+}
+
+/**
+ * 지금 범위가 이 데이터의 기본 범위(데이터 길이에 맞춘 기본 기간 · 전체 채널 · 전체 상품)에서 벗어났는가.
+ * 화면에 보이는 선택지만 따진다 — 이 값이 참일 때만 '초기화'를 보여준다.
+ */
+export function scopeChanged(
+  filters: Filters,
+  days: number,
+  preferred: Exclude<RangePreset, "custom">,
+  shown: { period: boolean; channel: boolean; product: boolean }
+): boolean {
+  return (
+    (shown.channel && filters.channel !== "all") ||
+    (shown.product && filters.product !== "all") ||
+    (shown.period && filters.preset !== fitPreset(days, preferred))
+  );
 }
 
 export function capabilities(rows: DataRow[], derived: DerivedField[] = []): Capability[] {

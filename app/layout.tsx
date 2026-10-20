@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 // Pretendard(OFL) — 자체 호스팅, 화면에 쓰인 글자 범위만 나눠 받는다(public/fonts/pretendard)
 import "./pretendard.css";
@@ -39,7 +40,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AppProvider>
           {children}
           <AnalysisOverlay />
-          <ToastStack />
+          {/* 알림은 지금 주소를 읽으므로(이미 열린 화면으로 가는 버튼 숨김) 경계 안에 둔다 */}
+          <Suspense fallback={null}>
+            <ToastStack />
+          </Suspense>
         </AppProvider>
       </body>
     </html>

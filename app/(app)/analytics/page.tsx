@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { formatDateKR } from "@/lib/format";
+import { formatDateKR, josa } from "@/lib/format";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
@@ -18,7 +18,7 @@ import { computeKpis, exploreSeries, trendSeries } from "@/lib/analytics-engine"
 import { formatAxisKRW, formatKRW, formatNumber } from "@/lib/format";
 import { COLORS } from "@/lib/palette";
 import { DerivedField, MetricKey } from "@/lib/types";
-import { availableKpis, canSplit } from "@/lib/dataset-meta";
+import { anomaliesFor, availableKpis, canSplit } from "@/lib/dataset-meta";
 import { comparisonLabel } from "@/lib/report";
 import Select from "@/components/Select";
 import { DemoDataset } from "@/lib/types";
@@ -88,6 +88,7 @@ function AnalyticsView() {
       dimension === "channel" ? { ...filters, channel: "all" } : dimension === "product" ? { ...filters, product: "all" } : filters;
     return {
       kpis: availableKpis(computeKpis(dataset.rows, filters), dataset),
+      anomalies: anomaliesFor(dataset, filters),
       trend: trendSeries(dataset.rows, filters),
       breakdown: exploreSeries(dataset.rows, breakFilters, breakMetric, dimension),
     };
@@ -127,7 +128,7 @@ function AnalyticsView() {
           onClick={() => router.push(drill.from)}
           className="mb-4 inline-flex min-h-11 items-center gap-1 text-sub font-semibold text-ink-soft hover:text-ink"
         >
-          <ArrowLeft className="h-4 w-4" aria-hidden /> {drill.fromLabel}로 돌아가기
+          <ArrowLeft className="h-4 w-4" aria-hidden /> {josa(drill.fromLabel, "으로")} 돌아가기
         </button>
       )}
       <PageHeader
@@ -145,6 +146,7 @@ function AnalyticsView() {
         metric={metric}
         markDate={focused?.date}
         header={<MetricTabs kpis={data.kpis} selected={metric} onSelect={setPicked} />}
+        markers={data.anomalies.map((a) => ({ id: a.id, date: a.metrics[0]?.date ?? a.date, title: a.title, down: a.direction === "down" }))}
       />
 
       {dims.length > 0 && (

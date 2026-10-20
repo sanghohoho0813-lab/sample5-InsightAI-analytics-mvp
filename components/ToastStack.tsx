@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { CheckCircle2, Info, X, XCircle } from "lucide-react";
 import { useApp } from "@/lib/store";
 
 export default function ToastStack() {
   const { toasts, dismissToast } = useApp();
+  const pathname = usePathname();
+  const query = useSearchParams().toString();
+  // 이미 그 화면에 와 있으면 '열기' 버튼은 의미가 없으므로 숨긴다(저장 확인 문구는 남긴다).
+  const here = query ? `${pathname}?${query}` : pathname;
   if (toasts.length === 0) return null;
   return (
     <div
@@ -24,7 +29,7 @@ export default function ToastStack() {
           {t.type === "error" && <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-negative" aria-hidden />}
           {t.type === "info" && <Info className="mt-0.5 h-5 w-5 shrink-0 text-ink-soft" aria-hidden />}
           <span className="flex-1 text-ink">{t.message}</span>
-          {t.action?.href && (
+          {t.action?.href && t.action.href !== here && (
             <Link
               href={t.action.href}
               onClick={() => dismissToast(t.id)}

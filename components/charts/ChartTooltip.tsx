@@ -4,9 +4,14 @@
 export default function ChartTooltip({
   label,
   rows,
+  note,
+  noteTone = "negative",
 }: {
   label?: string;
   rows: { name: string; value: string; color?: string }[];
+  /** 아래에 덧붙이는 한 줄(예: 그날의 급변) */
+  note?: string;
+  noteTone?: "negative" | "positive";
 }) {
   return (
     <div className="rounded-control border border-line bg-surface px-3 py-2 text-meta shadow-raised">
@@ -22,6 +27,7 @@ export default function ChartTooltip({
           </div>
         ))}
       </div>
+      {note && <p className={`mt-2 max-w-[240px] border-t border-line pt-2 font-semibold ${noteTone === "negative" ? "text-negative" : "text-positive"}`}>{note}</p>}
     </div>
   );
 }

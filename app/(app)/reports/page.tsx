@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, FileText, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowUp, FileText, Pencil, Trash2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import EmptyState from "@/components/EmptyState";
@@ -20,6 +20,104 @@ import { PRIORITY } from "@/components/BriefingPanel";
 
 const DATETIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
 
+const SECTIONS = [
+  { id: "r-summary", label: "핵심 요약" },
+  { id: "r-scope", label: "분석 범위" },
+  { id: "r-findings", label: "주요 발견" },
+  { id: "r-risks", label: "위험 요소" },
+  { id: "r-actions", label: "권장 행동" },
+  { id: "r-meta", label: "생성 시점" },
+] as const;
+type SectionId = (typeof SECTIONS)[number]["id"];
+
+const jumpTo = (id: string) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+  // 화면 낭독기도 같은 위치에서 이어 읽도록 제목으로 초점을 옮긴다.
+  el.focus({ preventScroll: true });
+};
+
+/**
+ * 넓은 화면의 보고서 목차 — 지금 읽는 절을 표시하고, 누르면 그 절로 이동한다.
+ * 절마다 건수를 붙여 위험·행동이 몇 개인지 펼치기 전에 보이게 한다.
+ */
+function ReportToc({ counts }: { counts: Partial<Record<SectionId, { n: number; tone?: "negative" }>> }) {
+  const [active, setActive] = useState<SectionId>(SECTIONS[0].id);
+
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const bottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 8;
+      let current: SectionId = SECTIONS[0].id;
+      for (const { id } of SECTIONS) {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top <= 160) current = id;
+      }
+      setActive(bottom ? SECTIONS[SECTIONS.length - 1].id : current);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+
+  return (
+    <nav aria-label="보고서 목차" className="sticky top-[92px]">
+      <p className="eyebrow">목차</p>
+      <ol className="mt-3 space-y-0.5 border-l border-line">
+        {SECTIONS.map((s, i) => {
+          const on = active === s.id;
+          const c = counts[s.id];
+          return (
+            <li key={s.id}>
+              <a
+                href={`#${s.id}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActive(s.id);
+                  jumpTo(s.id);
+                }}
+                aria-current={on ? "location" : undefined}
+                className={`-ml-px flex min-h-9 items-center gap-2 border-l-2 py-1.5 pl-3.5 pr-1 text-meta transition-colors ${
+                  on ? "border-brand font-semibold text-ink" : "border-transparent text-ink-soft hover:border-line-strong hover:text-ink"
+                }`}
+              >
+                <span className={`tabular w-3 shrink-0 ${on ? "text-brand" : "text-ink-dim"}`}>{i + 1}</span>
+                <span className="min-w-0 flex-1">{s.label}</span>
+                {c && c.n > 0 && (
+                  <span
+                    className={`tabular rounded-full px-1.5 text-caption font-semibold ${
+                      c.tone === "negative" ? "bg-negative-soft text-negative" : "bg-surface-soft text-ink-soft"
+                    }`}
+                  >
+                    {c.n}
+                  </span>
+                )}
+              </a>
+            </li>
+          );
+        })}
+      </ol>
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" })}
+        className="mt-4 inline-flex min-h-9 items-center gap-1.5 pl-4 text-meta font-semibold text-ink-dim transition-colors hover:text-ink"
+      >
+        <ArrowUp className="h-3.5 w-3.5" aria-hidden /> 맨 위로
+      </button>
+    </nav>
+  );
+}
+
 function ReportDetail({ report }: { report: SavedReport }) {
   const router = useRouter();
   const { dataset, deleteReport, renameReport, showToast, switchDataset, setCustomRange, setFilters } = useApp();
@@ -28,7 +126,8 @@ function ReportDetail({ report }: { report: SavedReport }) {
   const source = findDataset(report.datasetId);
 
   const section = "border-t border-line px-5 py-7 md:px-12 md:py-9";
-  const h = "text-card font-bold text-ink md:text-[20px]";
+  // 목차에서 이동해 올 때 상단 막대에 가리지 않게 여백을 두고, 초점을 받을 수 있게 한다.
+  const h = "scroll-mt-24 text-card font-bold text-ink outline-none md:text-[20px]";
   // 위험 요소는 '위험' 섹션에, 나머지 발견은 '주요 발견'에 — 같은 내용을 두 번 쓰지 않는다.
   const risks = report.findings.filter((f) => f.impact === "negative");
   const findings = report.findings.filter((f) => f.impact !== "negative");
@@ -53,7 +152,8 @@ function ReportDetail({ report }: { report: SavedReport }) {
   };
 
   return (
-    <div className="mx-auto max-w-[920px]">
+    <div className="mx-auto max-w-[920px] xl:grid xl:max-w-[1136px] xl:grid-cols-[minmax(0,1fr)_176px] xl:gap-10">
+      <div className="min-w-0">
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
         <Link href="/reports" className="inline-flex min-h-11 items-center gap-1 text-sub font-semibold text-ink-soft hover:text-ink">
           <ArrowLeft className="h-4 w-4" aria-hidden /> 보고서 목록
@@ -158,7 +258,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
 
         {/* 1. 핵심 요약 */}
         <section className="px-5 py-7 md:px-12 md:py-9" aria-labelledby="r-summary">
-          <h2 id="r-summary" className={h}>
+          <h2 id="r-summary" tabIndex={-1} className={h}>
             <span className="tabular text-brand">1.</span> 핵심 요약
           </h2>
           <p className="mt-4 text-title font-bold leading-snug text-ink md:text-[26px]">{report.headline}</p>
@@ -183,7 +283,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
 
         {/* 2. 분석 범위 */}
         <section className={section} aria-labelledby="r-scope">
-          <h2 id="r-scope" className={h}>
+          <h2 id="r-scope" tabIndex={-1} className={h}>
             <span className="tabular text-brand">2.</span> 분석 범위
           </h2>
           <dl className="mt-3 grid gap-x-8 gap-y-3 text-sub sm:grid-cols-2">
@@ -226,7 +326,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
 
         {/* 3. 주요 발견 */}
         <section className={section} aria-labelledby="r-findings">
-          <h2 id="r-findings" className={h}>
+          <h2 id="r-findings" tabIndex={-1} className={h}>
             <span className="tabular text-brand">3.</span> 주요 발견
           </h2>
           <div className="mt-3 overflow-x-auto">
@@ -300,7 +400,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
 
         {/* 4. 위험 요소 */}
         <section className={section} aria-labelledby="r-risks">
-          <h2 id="r-risks" className={h}>
+          <h2 id="r-risks" tabIndex={-1} className={h}>
             <span className="tabular text-brand">4.</span> 위험 요소
           </h2>
           {risks.length === 0 && report.anomalies.length === 0 ? (
@@ -331,7 +431,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
 
         {/* 5. 권장 행동 */}
         <section className={section} aria-labelledby="r-actions">
-          <h2 id="r-actions" className={h}>
+          <h2 id="r-actions" tabIndex={-1} className={h}>
             <span className="tabular text-brand">5.</span> 권장 행동
           </h2>
           {report.recommendations.length === 0 ? (
@@ -358,7 +458,7 @@ function ReportDetail({ report }: { report: SavedReport }) {
 
         {/* 6. 생성 시점 */}
         <section className={`${section} bg-surface-soft`} aria-labelledby="r-meta">
-          <h2 id="r-meta" className={h}>
+          <h2 id="r-meta" tabIndex={-1} className={h}>
             <span className="tabular text-brand">6.</span> 생성 시점
           </h2>
           <p className="mt-2 text-sub text-ink">
@@ -382,6 +482,17 @@ function ReportDetail({ report }: { report: SavedReport }) {
           <Trash2 className="h-4 w-4" aria-hidden /> 이 보고서 삭제
         </button>
       </div>
+      </div>
+
+      <aside className="no-print hidden xl:block xl:pt-[60px]">
+        <ReportToc
+          counts={{
+            "r-findings": { n: findings.length },
+            "r-risks": { n: risks.length + report.anomalies.length, tone: "negative" },
+            "r-actions": { n: report.recommendations.length },
+          }}
+        />
+      </aside>
     </div>
   );
 }

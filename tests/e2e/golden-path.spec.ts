@@ -63,7 +63,10 @@ test.describe("핵심 흐름", () => {
   test("보고서: 저장 → 업무 기록 구조 → 새로고침 유지 → 이름 변경 → 삭제 후 되돌리기", async ({ page }) => {
     await page.goto("/dashboard");
     await page.getByRole("button", { name: "보고서로 저장" }).first().dblclick(); // 연속 클릭은 한 번만 저장
-    await page.getByRole("link", { name: "보고서 열기" }).click();
+    // 두 번째 클릭은 '저장된 보고서 보기'로 바뀐 자리에 닿아 바로 보고서로 갈 수 있다 — 그때는 알림의 '보고서 열기'가 숨는다.
+    const open = page.getByRole("link", { name: "보고서 열기" });
+    await expect(open.or(page.getByRole("heading", { name: "1. 핵심 요약" }))).toBeVisible();
+    if (await open.isVisible()) await open.click();
     await expect(page).toHaveURL(/\/reports\?id=/);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem("insightai.reports")!).length)).toBe(1);
 

@@ -5,6 +5,7 @@ import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { resolveDates, uniqueDates } from "@/lib/analytics-engine";
 import { canSplit } from "@/lib/dataset-meta";
+import { scopeChanged } from "@/lib/capabilities";
 import { btn, field } from "@/lib/ui";
 import { DemoDataset, Filters } from "@/lib/types";
 import Select from "./Select";
@@ -38,7 +39,7 @@ export default function ScopeSheet({ dataset, showPeriod = true }: { dataset: De
 
   const bounds = useMemo(() => {
     const d = uniqueDates(dataset.rows);
-    return { min: d[0] ?? "", max: d[d.length - 1] ?? "" };
+    return { min: d[0] ?? "", max: d[d.length - 1] ?? "", days: d.length };
   }, [dataset]);
   const current = useMemo(() => resolveDates(dataset.rows, filters).currentDates, [dataset, filters]);
 
@@ -53,10 +54,11 @@ export default function ScopeSheet({ dataset, showPeriod = true }: { dataset: De
   ]
     .filter(Boolean)
     .join(" · ");
-  const changed =
-    (showChannel && filters.channel !== "all") ||
-    (showProduct && filters.product !== "all") ||
-    (showPeriod && filters.preset !== settings.defaultPreset);
+  const changed = scopeChanged(filters, bounds.days, settings.defaultPreset, {
+    period: showPeriod,
+    channel: showChannel,
+    product: showProduct,
+  });
 
   const openSheet = () => {
     setDraft({
@@ -130,6 +132,12 @@ export default function ScopeSheet({ dataset, showPeriod = true }: { dataset: De
       >
         <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
         <span className="truncate">{summary}</span>
+        {changed && (
+          <>
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden />
+            <span className="sr-only">(기본 범위에서 바꿈)</span>
+          </>
+        )}
         <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-ink-dim" aria-hidden />
       </button>
 

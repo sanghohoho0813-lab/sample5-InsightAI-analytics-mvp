@@ -6,6 +6,7 @@ import PageHeader from "@/components/PageHeader";
 import PageSkeleton from "@/components/PageSkeleton";
 import FilterToolbar from "@/components/FilterToolbar";
 import BriefingPanel from "@/components/BriefingPanel";
+import ReadingGuide from "@/components/ReadingGuide";
 import MetricTabs from "@/components/MetricTabs";
 import AnomalyList from "@/components/AnomalyList";
 import ContributionBars from "@/components/ContributionBars";
@@ -26,7 +27,7 @@ import { MetricKey } from "@/lib/types";
 import { btn } from "@/lib/ui";
 
 export default function DashboardPage() {
-  const { dataset, filters, reports, saveReport, setFilters } = useApp();
+  const { dataset, filters, reports, saveReport, setFilters, readIds, markRead } = useApp();
   const [picked, setPicked] = useState<MetricKey>("revenue");
 
   const data = useMemo(() => {
@@ -86,7 +87,10 @@ export default function DashboardPage() {
       />
 
       <FilterToolbar dataset={dataset} />
+      <ReadingGuide />
 
+      {/* 범위를 바꾸면 결과가 새로 계산되었음을 짧은 전환으로 알린다 */}
+      <div key={data.signature} className="animate-fade-in">
       {/* 1. 경영 브리핑 — 무엇이 변했나 → 왜 → 위험 → 다음 행동 */}
       <BriefingPanel b={brief} period={period} derived={dataset.derived} trend={data.trend.map((p) => p.revenue)} />
 
@@ -100,6 +104,7 @@ export default function DashboardPage() {
             points={data.trend}
             metric={metric}
             header={<MetricTabs kpis={brief.kpis} selected={metric} onSelect={setPicked} />}
+            markers={brief.anomalies.map((a) => ({ id: a.id, date: a.metrics[0]?.date ?? a.date, title: a.title, down: a.direction === "down" }))}
           />
         </div>
         <Panel>
@@ -115,7 +120,12 @@ export default function DashboardPage() {
             }
           />
           <div className="mt-2">
-            <AnomalyList anomalies={brief.anomalies.slice(0, 5)} empty={anomalyEmpty} />
+            <AnomalyList
+              anomalies={brief.anomalies.slice(0, 5)}
+              unreadIds={new Set(brief.anomalies.filter((a) => a.severity !== "info" && !readIds.includes(a.id)).map((a) => a.id))}
+              onRead={(id) => markRead([id])}
+              empty={anomalyEmpty}
+            />
           </div>
         </Panel>
       </div>
@@ -183,6 +193,7 @@ export default function DashboardPage() {
             </p>
           )}
         </Panel>
+      </div>
       </div>
     </>
   );
